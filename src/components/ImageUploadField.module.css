@@ -1,0 +1,155 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.label {
+  color: var(--text-secondary);
+  font-size: var(--type-size-14);
+  font-weight: 500;
+  line-height: var(--line-height);
+}
+
+.input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+/* 업로드 영역: 비어 있음 */
+.drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-5);
+  width: 100%;
+  height: 96px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-4);
+  background: var(--surface-input);
+  color: var(--text-muted);
+  line-height: var(--line-height);
+  cursor: pointer;
+}
+
+.drop:hover,
+.dragging {
+  border-color: var(--accent-border-focus);
+}
+
+.drop:focus-visible {
+  outline: 1px solid var(--accent-border-focus);
+  outline-offset: 1px;
+}
+
+.invalid,
+.invalid:hover {
+  border: 1.5px solid var(--system-negative-default);
+  color: var(--system-negative-default);
+}
+
+.dropTitle {
+  color: var(--text-secondary);
+  font-size: var(--type-size-13);
+  font-weight: 500;
+}
+
+.dropHint {
+  color: var(--text-muted);
+  font-size: var(--type-size-12);
+}
+
+/* 업로드 영역: 첨부됨 */
+.attached {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  width: 100%;
+  height: 96px;
+  padding: var(--space-12);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-4);
+  background: var(--surface-input);
+}
+
+.preview {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 128px;
+  height: 72px;
+  overflow: hidden;
+  border-radius: var(--radius-3);
+  background: var(--primary-800);
+  color: var(--primary-300);
+}
+
+.previewImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  line-height: var(--line-height);
+}
+
+.fileName {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: var(--type-size-14);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileMeta {
+  color: var(--text-muted);
+  font-size: var(--type-size-12);
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-10);
+  font-size: var(--type-size-13);
+}
+
+.action {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: inherit;
+  line-height: var(--line-height);
+  cursor: pointer;
+}
+
+.replace {
+  color: var(--accent-text);
+}
+
+.remove {
+  color: var(--text-muted);
+}
+
+.message {
+  color: var(--system-negative-default);
+  font-size: var(--type-size-13);
+  line-height: var(--line-height);
+}
+
+@media (max-width: 760px) {
+  .preview {
+    width: 96px;
+    height: 56px;
+  }
+}

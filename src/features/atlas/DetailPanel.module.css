@@ -1,0 +1,230 @@
+.intro {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  line-height: var(--line-height);
+}
+
+.crumbRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.crumb {
+  color: var(--text-muted);
+  font-size: var(--type-size-12);
+}
+
+.close {
+  display: flex;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.close:hover {
+  color: var(--text-primary);
+}
+
+.title {
+  color: var(--text-primary);
+  font-size: var(--type-size-26);
+  font-weight: 700;
+}
+
+.meta {
+  color: var(--text-secondary);
+  font-size: var(--type-size-13);
+  white-space: pre-wrap;
+}
+
+.photo {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: var(--space-4);
+  margin: 0;
+}
+
+.photoImage, .photoState {
+  width: 100%;
+  height: 76px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-4);
+  background: var(--surface-input);
+  object-fit: cover;
+}
+
+.photoState {
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  font-size: var(--type-size-13);
+}
+
+.credit, .historySource {
+  color: var(--text-muted);
+  font-size: var(--type-size-12);
+  line-height: var(--line-height);
+  overflow-wrap: anywhere;
+}
+
+.credit a, .historySource a {
+  color: var(--accent-text);
+  text-decoration: none;
+}
+
+.credit a:hover, .historySource a:hover {
+  text-decoration: underline;
+}
+
+.historySource {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+/* 요약 접기: 6줄까지 보이고 아래를 흐리게 */
+.clamp {
+  display: flex;
+  flex-direction: column;
+}
+
+.clamped,
+.clampedFade {
+  max-height: calc(var(--line-height) * 6em);
+  overflow: hidden;
+}
+
+.clampedFade {
+  mask-image: linear-gradient(to bottom, #000 45%, transparent);
+}
+
+.clampToggle {
+  display: flex;
+  align-self: center;
+  padding: var(--space-2) var(--space-8);
+  border: 0;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.clampToggle:hover {
+  color: var(--text-primary);
+}
+
+.historySource {
+  margin-top: var(--space-6);
+}
+
+.linkList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+/* 작품 그룹(접기·펼치기) */
+.groupList {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: var(--space-6);
+}
+
+.group {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-4);
+  background: var(--surface-panel);
+}
+
+.groupHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  width: 100%;
+  padding: var(--space-8) var(--space-10);
+  border: 0;
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.groupHeader:hover {
+  color: var(--text-primary);
+}
+
+.groupName {
+  flex: 1 0 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: var(--type-size-14);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.groupCount {
+  color: var(--accent-text);
+  font-size: var(--type-size-13);
+}
+
+.groupBody {
+  padding: var(--space-4) var(--space-10) var(--space-10);
+  border-top: 1px solid var(--border-default);
+}
+
+.clusterList {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: 0;
+}
+
+.control, .currentPage {
+  min-height: 32px;
+  padding: var(--space-5) var(--space-10);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-4);
+  background: var(--surface-panel);
+  color: var(--text-secondary);
+  font-size: var(--type-size-13);
+}
+
+.control {
+  align-self: flex-start;
+  cursor: pointer;
+}
+
+.control:disabled {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+/* 패널 하단 가운데에 고정(목록이 길면 스크롤해도 보이게) */
+.pagination {
+  position: sticky;
+  bottom: calc(-1 * var(--space-16));
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-8);
+  margin-top: auto;
+  padding: var(--space-12) 0 var(--space-16);
+  background: var(--surface-panel);
+}
+
+.currentPage {
+  background: var(--surface-selected);
+  border-color: var(--accent-border-subtle);
+  color: var(--accent-text);
+}

@@ -1,0 +1,161 @@
+.map {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--background-map);
+}
+
+.surface {
+  position: absolute;
+  inset: 0;
+  cursor: grab;
+}
+
+.surface:active {
+  cursor: grabbing;
+}
+
+.svg {
+  display: block;
+}
+
+.graticule {
+  fill: none;
+  stroke: var(--map-land);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.land {
+  fill: var(--map-land-secondary);
+}
+
+.borders {
+  fill: none;
+  stroke: var(--map-boundary);
+  stroke-width: 0.6;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+
+
+
+.marker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+}
+
+/* 선택한 장소: 핀 왼쪽에 이름 상자와 연결선 */
+.callout {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  transform: translate(calc(-100% - 13px), -50%);
+  pointer-events: none;
+}
+
+.calloutBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-9) var(--space-12);
+  border: 1px solid var(--accent-border-subtle);
+  border-radius: var(--radius-4);
+  background: var(--surface-panel);
+  line-height: var(--line-height);
+  white-space: nowrap;
+}
+
+.calloutTitle {
+  color: var(--accent-text);
+  font-size: var(--type-size-14);
+}
+
+.calloutMeta {
+  color: var(--text-secondary);
+  font-size: var(--type-size-12);
+}
+
+.calloutLine {
+  width: 38px;
+  height: 1px;
+  background: var(--accent-pin-muted);
+}
+
+.controls {
+  position: absolute;
+  top: 22px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-4);
+  background: var(--surface-panel);
+}
+
+.control {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 39px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--border-default);
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.control:last-child {
+  border-bottom: 0;
+}
+
+.control:hover {
+  background: var(--surface-hover);
+}
+
+.meta {
+  position: absolute;
+  bottom: 16px;
+  display: flex;
+  justify-content: flex-end;
+  color: var(--text-muted);
+  font-size: var(--type-size-12);
+  line-height: var(--line-height);
+  pointer-events: none;
+}
+
+.scale {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.scaleBar {
+  height: 1px;
+  background: var(--text-muted);
+}
+
+
+@media (max-width: 760px) {
+  /* 손가락으로 확대·축소하므로 +/− 는 숨기고 처음 위치로 버튼만 남김 */
+  .controls {
+    top: 12px;
+  }
+
+  .control:not(:last-child) {
+    display: none;
+  }
+
+  .meta {
+    bottom: 26px;
+  }
+
+  /* 바텀시트에 이름이 보이므로 지도 위 이름 상자는 숨김 */
+  .callout {
+    display: none;
+  }
+}

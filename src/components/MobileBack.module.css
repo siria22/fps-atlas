@@ -1,0 +1,18 @@
+.back {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .back {
+    display: block;
+    align-self: flex-start;
+    padding: var(--space-4) 0;
+    border: 0;
+    background: none;
+    color: var(--accent-text);
+    font: inherit;
+    font-size: var(--type-size-14);
+    font-weight: 500;
+    cursor: pointer;
+  }
+}

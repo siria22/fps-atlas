@@ -1,0 +1,196 @@
+.panel {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-20);
+  width: var(--layout-filter-width);
+  padding: var(--space-16) var(--space-18);
+  overflow-y: auto;
+  border-right: 1px solid var(--border-default);
+  background: var(--surface-panel);
+  line-height: var(--line-height);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+}
+
+.title {
+  flex: 1;
+  color: var(--text-primary);
+  font-size: var(--type-size-19);
+}
+
+.reset,
+.close,
+.bulk button {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.reset {
+  color: var(--text-secondary);
+  font-size: var(--type-size-13);
+}
+
+.close {
+  display: flex;
+  color: var(--text-secondary);
+}
+
+.reset:hover,
+.close:hover,
+.bulk button:hover {
+  color: var(--text-primary);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+}
+
+.labelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--type-size-14);
+  font-weight: 700;
+}
+
+.count {
+  color: var(--text-muted);
+  font-size: var(--type-size-13);
+  font-weight: 400;
+}
+
+.bulk {
+  display: flex;
+  gap: var(--space-12);
+}
+
+.bulk button {
+  color: var(--accent-text);
+  font-size: var(--type-size-13);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+/* 근거 수준 툴팁 */
+.tip {
+  position: relative;
+  display: inline-flex;
+}
+
+.tipText {
+  position: absolute;
+  top: calc(100% + var(--space-6));
+  left: 0;
+  z-index: 3;
+  width: 220px;
+  padding: var(--space-8) var(--space-10);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-4);
+  background: var(--background-canvas);
+  box-shadow: var(--shadow-menu);
+  color: var(--text-secondary);
+  font-size: var(--type-size-13);
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.12s;
+  pointer-events: none;
+}
+
+/* 마지막 칩(기타)의 툴팁은 패널 밖으로 나가 가로 스크롤이 생기지 않게 오른쪽에 맞춘다. */
+.tip:last-child .tipText {
+  right: 0;
+  left: auto;
+}
+
+.tip:hover .tipText,
+.tip:focus-within .tipText {
+  visibility: visible;
+  opacity: 1;
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+  height: 42px;
+  padding: 0 var(--space-13);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-4);
+  background: var(--background-canvas);
+  color: var(--text-muted);
+}
+
+.search:focus-within {
+  border-color: var(--accent-border-focus);
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: var(--type-size-14);
+}
+
+.searchInput::placeholder {
+  color: var(--text-muted);
+}
+
+.gameList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.gameOption {
+  padding: var(--space-4) 0;
+  color: var(--text-secondary);
+  font-size: var(--type-size-14);
+}
+
+.empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--type-size-13);
+}
+
+@media (max-width: 760px) {
+  /* M-01-d: 전체 화면 시트 */
+  .panel {
+    top: 8px;
+    right: 0;
+    width: auto;
+    padding: var(--space-16);
+    border-top: 1px solid var(--border-default);
+    border-right: 0;
+    border-radius: 16px 16px 0 0;
+  }
+}

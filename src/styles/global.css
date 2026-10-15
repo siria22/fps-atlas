@@ -1,0 +1,74 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--background-canvas);
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  font-size: var(--type-size-16);
+  line-height: var(--line-height);
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+/* 데스크톱(1440 기준)은 좁은 창에서 가로 스크롤, 760 이하는 모바일 레이아웃 */
+@media (min-width: 761px) {
+  html,
+  body {
+    min-width: 1440px;
+  }
+}
+
+@media (max-width: 760px) {
+  /* 카드·목록 안의 긴 이름·주소가 칸 밖으로 나가지 않게 */
+  body {
+    overflow-wrap: break-word;
+  }
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+
+/* 스크롤바: 기본 회색 막대 대신 패널 톤에 맞춘 얇은 막대 */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: var(--border-strong) padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--border-focus-neutral);
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+}

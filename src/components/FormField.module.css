@@ -1,0 +1,107 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.label {
+  color: var(--text-secondary);
+  font-size: var(--type-size-14);
+  font-weight: 500;
+  line-height: var(--line-height);
+}
+
+.message {
+  color: var(--system-negative-default);
+  font-size: var(--type-size-13);
+  line-height: var(--line-height);
+}
+
+.hint {
+  color: var(--text-muted);
+  font-size: var(--type-size-13);
+  line-height: var(--line-height);
+}
+
+/* 입력란 */
+.control {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 34px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-4);
+  background: var(--surface-input);
+}
+
+.control:focus-within {
+  border-color: var(--accent-border-focus);
+}
+
+.invalid,
+.invalid:focus-within {
+  border: 1.5px solid var(--system-negative-default);
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 var(--space-12);
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: var(--type-size-15);
+  line-height: var(--line-height);
+}
+
+.input::placeholder {
+  color: var(--text-muted);
+}
+
+.select {
+  appearance: none;
+  padding-right: calc(var(--space-12) + 14px + var(--space-8));
+  cursor: pointer;
+}
+
+.select option {
+  background: var(--surface-input);
+}
+
+.trailing {
+  position: absolute;
+  right: var(--space-12);
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+
+.alert {
+  color: var(--system-negative-default);
+}
+
+/* 관리자 입력 (검토 카드 안의 작은 입력) */
+.admin {
+  width: 100%;
+  height: 25px;
+  padding: 0 var(--space-8);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-4);
+  outline: none;
+  background: var(--surface-input);
+  color: var(--text-primary);
+  font-size: var(--type-size-13);
+  line-height: var(--line-height-tight);
+}
+
+.admin:focus {
+  border-color: var(--accent-border-focus);
+}
+
+select.admin {
+  appearance: none;
+  cursor: pointer;
+}

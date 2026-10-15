@@ -1,0 +1,222 @@
+.body {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.filterButton {
+  position: absolute;
+  top: 22px;
+  left: 24px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  height: 42px;
+  padding: 0 var(--space-16);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-4);
+  background: var(--surface-panel);
+  color: var(--text-primary);
+  font-size: var(--type-size-14);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.filterButton:hover {
+  border-color: var(--accent-border-focus);
+}
+
+.filterDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-pin);
+}
+
+.stats {
+  position: absolute;
+  top: 32px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  line-height: var(--line-height);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.statsLabel {
+  color: var(--text-muted);
+  font-size: var(--type-size-13);
+}
+
+.statsValue {
+  color: var(--text-primary);
+  font-size: var(--type-size-15);
+}
+
+.statsSub {
+  color: var(--text-secondary);
+  font-size: var(--type-size-13);
+}
+
+.legend {
+  position: absolute;
+  bottom: 40px;
+  left: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-9);
+  width: fit-content;
+  padding: var(--space-14);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-4);
+  background: var(--surface-panel);
+  line-height: var(--line-height);
+}
+
+.legendItems {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  color: var(--text-secondary);
+  font-size: var(--type-size-13);
+}
+
+.legendDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-pin);
+}
+
+.legendCluster {
+  margin-left: var(--space-4);
+}
+
+/* 화면 09: 지도 가운데 '필터 결과 0개' */
+.emptyCard {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-8);
+  width: 420px;
+  padding: var(--space-16) var(--space-24);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-4);
+  background: var(--surface-panel);
+  line-height: var(--line-height);
+  text-align: center;
+  transform: translate(-50%, -50%);
+}
+
+.emptyTitle {
+  color: var(--text-primary);
+  font-size: var(--type-size-15);
+}
+
+.emptyBody {
+  color: var(--text-secondary);
+  font-size: var(--type-size-14);
+}
+
+.emptyButton {
+  margin-top: var(--space-4);
+  height: 38px;
+  padding: 0 var(--space-14);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-4);
+  background: var(--surface-hover);
+  color: var(--text-primary);
+  font-size: var(--type-size-14);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  width: var(--layout-panel-width);
+  padding: var(--space-16) var(--space-18);
+  overflow-y: auto;
+  border-left: 1px solid var(--border-default);
+  background: var(--surface-panel);
+}
+
+/* 바텀시트 손잡이: 데스크톱에서는 숨김 */
+.sheetHandle {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .filterButton {
+    top: 12px;
+    left: 16px;
+  }
+
+  .stats {
+    top: 22px;
+    left: 110px;
+    gap: var(--space-8);
+  }
+
+  .legend {
+    bottom: 16px;
+    left: 16px;
+    padding: var(--space-10) var(--space-12);
+  }
+
+  .emptyCard {
+    width: calc(100% - 32px);
+    padding: var(--space-16);
+  }
+
+  /* M-01-b/c · M-02: 바텀시트. 처음엔 화면 절반, 펼치면 위 8px만 남김 */
+  .panel {
+    top: auto;
+    left: 0;
+    width: auto;
+    height: 52%;
+    padding: 0 var(--space-16) var(--space-16);
+    border-top: 1px solid var(--border-default);
+    border-left: 0;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -6px 24px rgb(0 0 0 / 45%);
+    transition: height 0.2s;
+  }
+
+  .panelExpanded {
+    height: calc(100% - 8px);
+  }
+
+  .sheetHandle {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    flex-shrink: 0;
+    justify-content: center;
+    margin: 0 calc(-1 * var(--space-16));
+    padding: var(--space-10) 0 var(--space-8);
+    border: 0;
+    background: var(--surface-panel);
+    cursor: grab;
+    touch-action: none;
+  }
+
+  .sheetHandle span {
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border-strong);
+  }
+}

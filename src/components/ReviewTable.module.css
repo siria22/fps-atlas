@@ -1,0 +1,138 @@
+/* Figma `SectionCard / 관리자 제보 표`: 관리(04·04-c)와 내 제보(08)가 함께 쓰는 목록 표 */
+.tableCard {
+  display: flex;
+  min-height: 640px;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-6);
+  background: var(--surface-panel);
+}
+.tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  padding: var(--space-14) var(--space-16);
+}
+.chips {
+  display: flex;
+  gap: var(--space-8);
+}
+.search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  color: var(--text-secondary);
+  font-size: var(--type-size-13);
+}
+.search input {
+  width: 120px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+}
+.search input::placeholder {
+  color: var(--text-muted);
+}
+.sort {
+  border: 0;
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.head {
+  display: flex;
+  height: 40px;
+  align-items: center;
+  padding: 0 var(--space-16);
+  border-top: 1px solid var(--accent-border-subtle);
+  border-bottom: 1px solid var(--accent-border-subtle);
+  border-left: 2px solid var(--accent-border-subtle);
+  background: var(--surface-input);
+  color: var(--text-secondary);
+  font-size: var(--type-size-13);
+}
+.head span:nth-child(1) { width: 112px; }
+.head span:nth-child(2) { width: 184px; }
+.head span:nth-child(3) { width: 138px; }
+.head span:nth-child(4) { width: 144px; }
+.head span:nth-child(5) { width: 174px; }
+.head span:nth-child(6) { width: 144px; }
+.empty {
+  padding: var(--space-28);
+  color: var(--text-muted);
+  font-size: var(--type-size-14);
+  text-align: center;
+}
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+  padding: var(--space-16);
+  color: var(--text-muted);
+  font-size: var(--type-size-13);
+}
+.pager {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+}
+.pagerArrow {
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.pagerArrow:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.footnote {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  margin: 0;
+  padding: 0 var(--space-16) var(--space-16);
+  color: var(--text-muted);
+  font-size: var(--type-size-12);
+}
+
+/* 오른쪽 검토 패널 (SectionCard · 관리자 검토) */
+
+@media (max-width: 760px) {
+  /* 모바일: 표 머리 없이 카드 목록 */
+  .tableCard {
+    min-height: 0;
+  }
+
+  .tools {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .chips {
+    flex-wrap: wrap;
+  }
+
+  .search input {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+  }
+
+  .head {
+    display: none;
+  }
+
+  .footer {
+    gap: var(--space-8);
+  }
+}

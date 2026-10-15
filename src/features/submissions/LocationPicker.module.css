@@ -1,0 +1,251 @@
+/* Figma 통합_v1 `SectionCard / 위치 선택 · 주·도` (88:2139) 제보자 유형 */
+.card {
+  position: sticky;
+  top: var(--space-16);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-14);
+  padding: var(--space-18) var(--space-20) var(--space-20);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-4);
+  background: var(--surface-panel);
+}
+.title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+.title h2 {
+  margin: 0 0 var(--space-6);
+  font-size: var(--type-size-19);
+}
+.titleIcon {
+  color: var(--accent-text);
+}
+.caption {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--type-size-14);
+}
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-12);
+}
+.field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+.label {
+  color: var(--text-secondary);
+  font-size: var(--type-size-15);
+  font-weight: 500;
+}
+.help {
+  margin-top: calc(-1 * var(--space-6));
+  color: var(--text-muted);
+  font-size: var(--type-size-13);
+}
+.combo {
+  position: relative;
+  display: flex;
+  align-items: center;
+  color: var(--text-muted);
+}
+.combo > svg {
+  position: absolute;
+  pointer-events: none;
+}
+.combo > svg:first-child {
+  left: var(--space-10);
+}
+.combo > svg:last-child {
+  right: var(--space-10);
+  color: var(--text-secondary);
+}
+.input {
+  width: 100%;
+  min-height: 36px;
+  padding: var(--space-8) 32px;
+  border: 1px solid var(--accent-border-subtle);
+  border-radius: var(--radius-4);
+  background: var(--surface-input);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--type-size-15);
+}
+.input::placeholder {
+  color: var(--text-muted);
+}
+.input:focus {
+  border-color: var(--accent-border-focus);
+  outline: none;
+}
+.input:disabled {
+  opacity: 0.55;
+}
+.input::-webkit-calendar-picker-indicator {
+  opacity: 0;
+}
+
+.map {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-4);
+  background: var(--background-map);
+}
+.map svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  cursor: grab;
+}
+.region,
+.regionSelected {
+  fill: var(--map-land);
+  stroke: var(--map-boundary);
+  cursor: pointer;
+}
+.region:hover {
+  fill: var(--surface-selected);
+}
+.regionSelected {
+  fill: var(--accent-action);
+  stroke: var(--accent-pin);
+}
+.mapHint {
+  position: absolute;
+  top: var(--space-10);
+  left: var(--space-10);
+  padding: var(--space-4) var(--space-8);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-3);
+  background: var(--surface-panel);
+  color: var(--text-secondary);
+  font-size: var(--type-size-13);
+  pointer-events: none;
+}
+.zoom {
+  position: absolute;
+  top: var(--space-10);
+  right: var(--space-10);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-4);
+  background: var(--surface-panel);
+}
+.zoom button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.zoom button + button {
+  border-top: 1px solid var(--border-default);
+}
+
+.callout {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-8);
+  padding: var(--space-10) var(--space-12);
+  border: 1px solid var(--accent-border-subtle);
+  border-radius: var(--radius-4);
+  background: var(--surface-input);
+  color: var(--text-secondary);
+  font-size: var(--type-size-14);
+}
+.callout > svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--accent-text);
+}
+.callout b {
+  color: var(--text-primary);
+}
+
+/* 관리자 유형: 04 검토 패널 안에 넣을 때, 공개 핀과 좌표 */
+.embedded {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+}
+.pin circle {
+  fill: var(--surface-panel);
+  stroke: var(--accent-pin);
+  stroke-width: 2;
+}
+.pin .pinDot {
+  fill: var(--accent-pin);
+  stroke: none;
+}
+.coords {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: var(--space-8);
+  align-items: end;
+}
+.coordInput {
+  width: 100%;
+  min-height: 36px;
+  padding: var(--space-8) var(--space-10);
+  border: 1px solid var(--accent-border-subtle);
+  border-radius: var(--radius-4);
+  background: var(--surface-input);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--type-size-15);
+}
+.coordInput:disabled {
+  opacity: 0.55;
+}
+.reset {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  gap: var(--space-6);
+  padding: 0 var(--space-12);
+  border: 1px solid var(--accent-border-focus);
+  border-radius: var(--radius-4);
+  background: var(--surface-input);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--type-size-14);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.reset:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+@media (max-width: 760px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .coords {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  /* 안내 상자가 확대 버튼 아래로 들어가지 않게 */
+  .mapHint {
+    right: 48px;
+    font-size: var(--type-size-12);
+  }
+
+  .coords > :last-child {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}

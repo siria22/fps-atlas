@@ -1,0 +1,35 @@
+node_modules
+dist
+*.local
+*.tsbuildinfo
+
+# 비밀값: 절대 커밋하지 않음
+.env
+.env.*
+# .env.example도 로컬에만 둔다(2026-10-15)
+
+# Supabase CLI 로컬 상태
+supabase/.temp
+supabase/.branches
+
+# 에디터·OS
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+Thumbs.db
+*.log
+
+# 내려받은 원본 데이터(scripts/build-geo.ts)
+.cache
+
+# 개발 방향 논의용 메모(커밋하지 않음)
+/scratch
+
+# 내부 작업 문서·데이터 도구(로컬에만 둠). 공개 저장소에는 배포에 필요한 것과 supabase/만 올린다.
+/CLAUDE.md
+/docs
+/scripts
+/seed
+# 시드 데이터 백업(zip)
+/.backup

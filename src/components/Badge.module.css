@@ -1,0 +1,47 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-6);
+  border-radius: var(--radius-3);
+  font-size: var(--type-size-14);
+  line-height: var(--line-height-tight);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Evidence Badge */
+.official {
+  background: var(--primary-800);
+  color: var(--primary-100);
+}
+
+.likely {
+  background: var(--primary-900);
+  color: var(--primary-300);
+}
+
+.community {
+  background: var(--neutral-900);
+  color: var(--neutral-400);
+}
+
+/* StatusBadge */
+.status {
+  font-size: var(--type-size-13);
+}
+
+.pending {
+  background: var(--surface-selected);
+  color: var(--accent-text);
+}
+
+.approved {
+  background: var(--surface-panel);
+  color: var(--text-primary);
+}
+
+.rejected {
+  background: var(--surface-panel);
+  color: var(--text-secondary);
+}

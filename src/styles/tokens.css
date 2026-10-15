@@ -1,0 +1,109 @@
+/* Figma 변수(FPS_MAP · v2 페이지)에서 옮긴 값. 이름은 Figma 변수 경로의 '/'를 '-'로 바꾼 것. */
+:root {
+  /* background */
+  --background-canvas: #030712;
+  --background-map: #030712;
+
+  /* surface */
+  --surface-panel: #222222;
+  --surface-input: #14183a;
+  --surface-hover: #14183a;
+  --surface-selected: #2a2e50;
+  --surface-transparent: #ffffff00;
+
+  /* border */
+  --border-default: #424242;
+  --border-strong: #616161;
+  --border-high-contrast: #e0e0e0;
+  --border-focus-neutral: #9e9e9e;
+  --border-map: #616161;
+  --border-on-accent: #030712;
+  --border-transparent: #ffffff00;
+
+  /* accent */
+  --accent-border-subtle: #71749b;
+  --accent-border-focus: #a5a8d2;
+  --accent-text: #c0c3ef;
+  --accent-action: #585c81;
+  --accent-pin: #c0c3ef;
+  --accent-pin-muted: #8a8eb6;
+
+  /* text */
+  --text-primary: #fafafa;
+  --text-secondary: #e0e0e0;
+  --text-subtle: #bdbdbd;
+  --text-muted: #9e9e9e;
+  --text-on-accent: #ffffff;
+
+  /* map */
+  --map-land: #2a2e50;
+  --map-land-secondary: #14183a;
+  --map-grid: #424242;
+  --map-boundary: #616161;
+
+  /* primitive (뱃지 등 semantic이 없는 곳에서만) */
+  --primary-100: #dfe0ff;
+  --primary-300: #a5a8d2;
+  --primary-800: #2a2e50;
+  --primary-900: #14183a;
+  --neutral-400: #bdbdbd;
+  --neutral-900: #222222;
+
+  /* system */
+  --system-negative-default: #dc0000;
+  --system-positive-default: #04b014;
+  --system-warning-default: #ffaa00;
+
+  /* space */
+  --space-0: 0px;
+  --space-1: 1px;
+  --space-2: 2px;
+  --space-3: 3px;
+  --space-4: 4px;
+  --space-5: 5px;
+  --space-6: 6px;
+  --space-7: 7px;
+  --space-8: 8px;
+  --space-9: 9px;
+  --space-10: 10px;
+  --space-12: 12px;
+  --space-13: 13px;
+  --space-14: 14px;
+  --space-16: 16px;
+  --space-18: 18px;
+  --space-20: 20px;
+  --space-24: 24px;
+  --space-28: 28px;
+  --space-32: 32px;
+  --space-36: 36px;
+  --space-52: 52px;
+
+  /* type */
+  --font-family: 'Noto Sans KR', system-ui, sans-serif;
+  --line-height: 1.45;
+  /* Figma 'auto' 줄 높이(뱃지·작은 라벨) */
+  --line-height-tight: 1.2;
+  --type-size-11: 11px;
+  --type-size-12: 12px;
+  --type-size-13: 13px;
+  --type-size-14: 14px;
+  --type-size-15: 15px;
+  --type-size-16: 16px;
+  --type-size-19: 19px;
+  --type-size-20: 20px;
+  --type-size-25: 25px;
+  --type-size-26: 26px;
+  --type-size-28: 28px;
+
+  /* layout (1440 데스크톱 기준) */
+  --layout-header-height: 72px;
+  --layout-footer-height: 42px;
+  --layout-panel-width: 420px;
+  --layout-filter-width: 360px;
+
+  --radius-2: 2px;
+  --radius-3: 3px;
+  --radius-4: 4px;
+  --radius-6: 6px;
+  --shadow-menu: 0 6px 14px rgba(0, 0, 0, 0.38);
+}

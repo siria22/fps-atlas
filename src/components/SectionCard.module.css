@@ -1,0 +1,47 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  padding: var(--space-20) var(--space-24);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-6);
+  background: var(--surface-panel);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  line-height: var(--line-height);
+}
+
+.title {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--type-size-19);
+  font-weight: 700;
+}
+
+.aside {
+  color: var(--text-muted);
+  font-size: var(--type-size-13);
+}
+
+/* Figma: SectionCard / 사건 관련 맵 · 역사 요약 */
+.compact {
+  flex-shrink: 0;
+  gap: var(--space-6);
+  padding: var(--space-8) 0 0;
+  border: 0;
+  border-top: 1px solid var(--border-default);
+  border-radius: 0;
+  color: var(--text-secondary);
+  font-size: var(--type-size-13);
+  line-height: var(--line-height);
+}
+
+.compact .title {
+  color: var(--text-secondary);
+  font-size: var(--type-size-13);
+}

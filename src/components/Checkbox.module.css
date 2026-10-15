@@ -1,0 +1,54 @@
+.label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  cursor: pointer;
+}
+
+.input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.box {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-2);
+  background: var(--surface-panel);
+  color: var(--text-on-accent);
+}
+
+.input:checked + .box {
+  border-color: var(--accent-border-focus);
+  background: var(--accent-action);
+}
+
+.input:focus-visible + .box {
+  outline: 1px solid var(--accent-border-focus);
+  outline-offset: 1px;
+}
+
+.check {
+  visibility: hidden;
+}
+
+.input:checked + .box .check {
+  visibility: visible;
+}
+
+@media (max-width: 760px) {
+  /* 긴 동의 문구가 화면 밖으로 나가지 않게 */
+  .label {
+    align-items: flex-start;
+    white-space: normal;
+  }
+}

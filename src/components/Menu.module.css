@@ -1,0 +1,113 @@
+/* 드롭다운 패널 공통 (게임 선택 목록, 게임 더보기) */
+.menu {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-4);
+  background: var(--surface-hover);
+  box-shadow: var(--shadow-menu);
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  height: 29px;
+  padding: 0 var(--space-7);
+  border: 0;
+  border-radius: var(--radius-3);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--type-size-13);
+  line-height: var(--line-height);
+  text-align: left;
+  cursor: pointer;
+}
+
+.option:hover {
+  background: var(--surface-selected);
+}
+
+/* 게임 더보기 드롭다운 */
+.gameMenu {
+  width: 240px;
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  padding: var(--space-6) var(--space-8);
+  color: var(--text-muted);
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: var(--type-size-13);
+  line-height: var(--line-height);
+}
+
+.searchInput::placeholder {
+  color: var(--text-muted);
+}
+
+.gameList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: 264px;
+  overflow-y: auto;
+}
+
+.gameOption {
+  padding: var(--space-6) var(--space-8);
+  border-radius: var(--radius-3);
+  color: var(--text-secondary);
+  font-size: var(--type-size-13);
+  line-height: var(--line-height);
+}
+
+.gameOption:hover {
+  background: var(--surface-selected);
+}
+
+.gameChecked {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--space-6) var(--space-8);
+}
+
+.footerButton {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: var(--type-size-12);
+  line-height: var(--line-height);
+  cursor: pointer;
+}
+
+.selectAll {
+  color: var(--accent-text);
+}
+
+.clearAll {
+  color: var(--text-muted);
+}
+
+.empty {
+  padding: var(--space-6) var(--space-8);
+  color: var(--text-muted);
+  font-size: var(--type-size-13);
+}

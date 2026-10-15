@@ -1,0 +1,45 @@
+/* 문의 작성 다이얼로그 내용 */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-14);
+}
+
+.form p {
+  margin: 0;
+}
+
+.textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: var(--space-8) var(--space-12);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-4);
+  outline: none;
+  background: var(--surface-input);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--type-size-15);
+  line-height: var(--line-height);
+  resize: vertical;
+}
+
+.textarea::placeholder {
+  color: var(--text-muted);
+}
+
+.textarea:focus {
+  border-color: var(--accent-border-focus);
+}
+
+.consent {
+  align-items: flex-start;
+  color: var(--text-secondary);
+  font-size: var(--type-size-13);
+  line-height: var(--line-height);
+}
+
+.error {
+  color: var(--system-negative-default);
+  font-size: var(--type-size-13);
+}

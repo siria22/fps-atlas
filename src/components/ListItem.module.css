@@ -1,0 +1,138 @@
+/* ── 맵 연결 (장소 상세 패널) ── */
+.mapLink {
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+  width: 100%;
+}
+
+.mapBody {
+  display: flex;
+  flex: 1 0 0;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
+.mapInfo {
+  display: flex;
+  flex: 1 0 0;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  line-height: var(--line-height);
+}
+
+.gameName {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: var(--type-size-14);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mapMeta {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--type-size-13);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mapDetail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  font-size: var(--type-size-13);
+  line-height: var(--line-height-tight);
+  overflow-wrap: anywhere;
+}
+
+.detailLink {
+  color: var(--accent-text);
+  text-decoration: none;
+}
+
+.detailLink:hover {
+  text-decoration: underline;
+}
+
+/* ── 인접 장소 묶음 (클러스터 패널) ── */
+.cluster {
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+  width: 100%;
+  padding: var(--space-6);
+  border: 0;
+  border-radius: var(--radius-4);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cluster > :first-child {
+  align-self: stretch;
+  width: auto;
+  height: auto;
+  aspect-ratio: 1;
+}
+
+/* 장소 행 사이 연한 구분선 */
+.clusterPlace + .clusterPlace {
+  border-top: 1px solid var(--border-default);
+  border-radius: 0;
+}
+
+.clusterPlace > :first-child {
+  align-self: auto;
+  aspect-ratio: auto;
+}
+
+.cluster:hover {
+  background: var(--surface-hover);
+}
+
+.clusterSelected,
+.clusterSelected:hover {
+  background: var(--surface-selected);
+}
+
+.clusterInfo {
+  display: flex;
+  flex: 1 0 0;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  line-height: var(--line-height);
+}
+
+.clusterGame,
+.clusterMap {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clusterGame {
+  color: var(--text-primary);
+  font-size: var(--type-size-14);
+  font-weight: 500;
+}
+
+.clusterMap {
+  color: var(--text-secondary);
+  font-size: var(--type-size-13);
+}
+
+.clusterCount {
+  flex-shrink: 0;
+  color: var(--accent-text);
+  font-size: var(--type-size-13);
+}
+
+.clusterEra {
+  color: var(--text-muted);
+  font-size: var(--type-size-13);
+}

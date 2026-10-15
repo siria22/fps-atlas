@@ -1,0 +1,67 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: var(--space-24);
+  background: rgba(3, 7, 18, 0.72);
+}
+
+.dialog {
+  display: flex;
+  width: min(480px, 100%);
+  flex-direction: column;
+  gap: var(--space-16);
+  padding: var(--space-24);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-6);
+  background: var(--surface-panel);
+  box-shadow: var(--shadow-menu);
+  color: var(--text-primary);
+  font-size: var(--type-size-14);
+  line-height: var(--line-height);
+}
+
+.danger {
+  border-color: var(--accent-border-subtle);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--type-size-19);
+  line-height: 1.35;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  color: var(--text-secondary);
+}
+
+.body p {
+  margin: 0;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-8);
+}
+
+@media (max-width: 760px) {
+  .backdrop {
+    padding: var(--space-16);
+  }
+
+  .dialog {
+    max-height: 100%;
+    padding: var(--space-20);
+    overflow-y: auto;
+  }
+
+  .actions {
+    flex-wrap: wrap;
+  }
+}

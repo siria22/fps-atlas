@@ -1,0 +1,123 @@
+/* 연동 해제 확인·완료 다이얼로그 내용과 다이얼로그 버튼 */
+.primary,
+.secondary,
+.danger,
+.outline {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--space-16);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-4);
+  background: var(--surface-input);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--type-size-14);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.primary {
+  border-color: var(--accent-border-focus);
+  background: var(--accent-action);
+  color: var(--text-on-accent);
+}
+
+.danger {
+  border-color: var(--system-negative-default);
+  background: var(--system-negative-default);
+  color: var(--text-on-accent);
+}
+
+.outline {
+  border-color: var(--border-default);
+  background: transparent;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.outline:hover {
+  border-color: var(--system-negative-default);
+  color: var(--text-primary);
+}
+
+.primary:disabled,
+.secondary:disabled,
+.danger:disabled,
+.outline:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.warning {
+  padding: var(--space-8) var(--space-10);
+  border: 1px solid var(--system-warning-default);
+  border-radius: var(--radius-4);
+  color: var(--text-primary);
+}
+
+.choice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.choice legend {
+  margin-bottom: var(--space-8);
+  padding: 0;
+  color: var(--text-primary);
+}
+
+.option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-10);
+  padding: var(--space-10) var(--space-12);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-4);
+  background: var(--surface-input);
+  cursor: pointer;
+}
+
+.option:has(input:checked) {
+  border-color: var(--accent-border-focus);
+  background: var(--surface-selected);
+}
+
+.option input {
+  margin-top: 3px;
+  accent-color: var(--accent-text);
+}
+
+.option span {
+  display: flex;
+  flex-direction: column;
+}
+
+.option b {
+  color: var(--text-primary);
+}
+
+.option small {
+  color: var(--text-muted);
+  font-size: var(--type-size-13);
+}
+
+.note {
+  color: var(--text-muted);
+  font-size: var(--type-size-13);
+}
+
+.link {
+  color: var(--accent-text);
+  font-size: var(--type-size-14);
+}
+
+.error {
+  color: var(--system-negative-default);
+  font-size: var(--type-size-13);
+}
