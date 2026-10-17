@@ -1,0 +1,1356 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>시드 검수대</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<style>
+/* 레이아웃: 왼쪽 전체 높이 기록 패널 + 오른쪽 2x2(위키백과 ko / en, 지도, 팬덤 위키). 색·간격은 src/styles/tokens.css 값 그대로. */
+:root {
+  --bg: #030712;
+  --panel: #222222;
+  --panel-2: #181a24;
+  --input: #14183a;
+  --selected: #2a2e50;
+  --border: #424242;
+  --border-strong: #616161;
+  --accent: #c0c3ef;
+  --accent-muted: #8a8eb6;
+  --accent-border: #71749b;
+  --accent-action: #585c81;
+  --text: #fafafa;
+  --text-2: #e0e0e0;
+  --text-subtle: #bdbdbd;
+  --text-muted: #9e9e9e;
+  --map-land: #2a2e50;
+  --map-land-2: #14183a;
+  --map-boundary: #616161;
+  --ok: #04b014;
+  --warn: #ffaa00;
+  --bad: #dc0000;
+  --changed: #ffaa00;
+  --font: 'Noto Sans KR', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+  --left-w: 460px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.45 var(--font);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+a { color: var(--accent); }
+
+/* ── 상단 바 ── */
+.top {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 16px; border-bottom: 1px solid var(--border); background: var(--panel-2);
+}
+.brand { display: flex; flex-direction: column; margin-right: 8px; }
+.brand b { font-size: 15px; }
+.brand span { color: var(--text-muted); font-size: 11px; }
+.file { color: var(--text-subtle); font-size: 12px; font-family: var(--mono); }
+.spacer { flex: 1; }
+.meter { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-subtle); font-variant-numeric: tabular-nums; }
+.meter .bar { width: 120px; height: 6px; border-radius: 3px; background: var(--input); overflow: hidden; }
+.meter .bar i { display: block; height: 100%; background: var(--ok); width: 0; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px;
+  border: 1px solid var(--border-strong); border-radius: 4px; background: var(--panel); font-size: 12px; white-space: nowrap;
+}
+.btn:hover { background: var(--input); }
+.btn.primary { background: var(--accent-action); border-color: var(--accent-border); color: var(--text); }
+.btn.primary:hover { background: #6a6e96; }
+.btn.small { padding: 3px 8px; font-size: 11px; }
+.btn[disabled] { opacity: .5; cursor: default; }
+.save-state { font-size: 12px; color: var(--text-muted); max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.save-state.ok { color: var(--ok); }
+.save-state.warn { color: var(--warn); }
+.toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-subtle); }
+
+/* ── 본문 ── */
+.main { flex: 1; min-height: 0; display: grid; grid-template-columns: var(--left-w) 1fr; }
+.left { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--border); background: var(--panel); }
+/* 가운데 열: 위키백과(ko/en 탭) 위, 지도 아래 · 오른쪽 열: 팬덤 위키가 전체 높이 */
+.grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); grid-template-rows: 1fr 1fr; min-height: 0; min-width: 0; }
+.pane { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+#paneWiki { grid-column: 1; grid-row: 1; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+#paneMap { grid-column: 1; grid-row: 2; border-right: 1px solid var(--border); }
+#paneFandom { grid-column: 2; grid-row: 1 / span 2; }
+.tabs { display: flex; gap: 2px; margin: -7px 0; align-self: stretch; }
+.tabs button { padding: 0 10px; border: 0; border-bottom: 2px solid transparent; background: none; font-size: 12px; font-weight: 700; letter-spacing: .02em; color: var(--text-muted); }
+.tabs button:hover { color: var(--text-2); }
+.tabs button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+.tabs button .tab-dot { display: inline-block; width: 6px; height: 6px; margin-left: 6px; border-radius: 50%; vertical-align: middle; background: var(--warn); }
+.wiki-meta { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+.wiki-layer { position: absolute; inset: 0; }
+.pane-head {
+  display: flex; align-items: center; gap: 8px; padding: 7px 12px; min-height: 38px;
+  border-bottom: 1px solid var(--border); background: var(--panel-2); font-size: 12px;
+}
+.pane-head .label { font-weight: 700; letter-spacing: .02em; color: var(--text-2); }
+.pane-head .sub { color: var(--text-muted); font-family: var(--mono); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+.pane-body { position: relative; flex: 1; min-height: 0; background: #fff; }
+.pane-body iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #fff; }
+.pane-empty {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  background: var(--bg); color: var(--text-muted); text-align: center; padding: 24px; font-size: 12px;
+}
+.pane-empty strong { color: var(--text-2); font-size: 13px; font-weight: 500; }
+.chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: 10px; font-size: 11px; border: 1px solid var(--border-strong); color: var(--text-subtle); white-space: nowrap; }
+.chip.ok { border-color: #1f6b27; color: #7ad685; }
+.chip.warn { border-color: #7a5a14; color: #ffc85a; }
+.chip.bad { border-color: #7a1f1f; color: #ff8a8a; }
+
+/* ── 왼쪽: 목록 ── */
+.list-tools { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.search { width: 100%; padding: 7px 10px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--input); }
+.filters { display: flex; flex-wrap: wrap; gap: 4px; }
+.filters button { padding: 2px 8px; border: 1px solid var(--border); border-radius: 12px; background: none; font-size: 11px; color: var(--text-subtle); }
+.filters button[aria-pressed="true"] { background: var(--selected); border-color: var(--accent-border); color: var(--accent); }
+.list { flex: 0 0 34%; overflow-y: auto; border-bottom: 1px solid var(--border-strong); }
+.row {
+  display: grid; grid-template-columns: 10px 1fr auto; gap: 8px; align-items: center; width: 100%;
+  padding: 5px 12px; border: 0; border-bottom: 1px solid #2c2c2c; background: none; text-align: left;
+}
+.row:hover { background: var(--input); }
+.row[aria-current="true"] { background: var(--selected); }
+.row .dot { width: 8px; height: 8px; border-radius: 50%; border: 1px solid var(--text-muted); }
+.row .dot.done { background: var(--ok); border-color: var(--ok); }
+.row .dot.auto { background: transparent; border: 2px solid var(--ok); }
+.auto-box { border: 1px solid var(--border); border-radius: 4px; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.auto-box.warn { border-color: #7a5a14; background: rgba(255,170,0,.06); }
+.auto-box.ok { border-color: #1f6b27; background: rgba(4,176,20,.06); }
+.auto-box b { font-size: 12px; }
+.auto-box ul { margin: 0; padding-left: 18px; color: var(--text-subtle); }
+.link-issues { margin: 0; padding-left: 18px; color: #ffc85a; font-size: 11px; }
+.row .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .nm small { color: var(--text-muted); margin-left: 6px; }
+.row .meta { display: flex; gap: 4px; align-items: center; color: var(--text-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.row .meta .edited { color: var(--changed); }
+.list-count { padding: 4px 12px; color: var(--text-muted); font-size: 11px; }
+
+/* ── 왼쪽: 상세 ── */
+.detail { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 14px 32px; display: flex; flex-direction: column; gap: 14px; }
+.detail-head { display: flex; align-items: flex-start; gap: 8px; }
+.detail-head h2 { margin: 0; font-size: 19px; line-height: 1.25; flex: 1; min-width: 0; text-wrap: balance; }
+.detail-head .nav { display: flex; gap: 4px; }
+.section { display: flex; flex-direction: column; gap: 6px; }
+.section-title { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); }
+.section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.fields { display: grid; grid-template-columns: 138px 1fr; gap: 4px 10px; align-items: center; }
+.fields.secondary .k { color: var(--text-muted); }
+.k { font-family: var(--mono); font-size: 11px; color: var(--text-subtle); overflow-wrap: anywhere; }
+.k button { all: unset; cursor: pointer; color: var(--accent); text-decoration: underline dotted; }
+.v { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.v .ctl { display: flex; gap: 4px; align-items: center; min-width: 0; }
+.v input[type="text"], .v input[type="number"], .v select, .v textarea {
+  width: 100%; min-width: 0; padding: 4px 7px; border: 1px solid var(--border); border-radius: 3px; background: var(--input);
+}
+.v textarea { resize: vertical; min-height: 44px; font-family: var(--mono); font-size: 11px; }
+.v input[readonly] { background: transparent; border-color: transparent; color: var(--text-muted); font-family: var(--mono); font-size: 11px; }
+.v.changed input, .v.changed select, .v.changed textarea { border-color: var(--changed); }
+.v .was { font-size: 11px; color: var(--changed); display: flex; gap: 6px; align-items: center; overflow-wrap: anywhere; }
+.v .was button { all: unset; cursor: pointer; text-decoration: underline; color: var(--text-subtle); }
+.v .empty-hint { font-size: 11px; color: var(--warn); }
+.coord-btn { white-space: nowrap; }
+.check { display: inline-flex; align-items: center; gap: 6px; }
+.check input { width: 15px; height: 15px; accent-color: var(--ok); }
+.wikistat { font-size: 11px; }
+
+.link-card { border: 1px solid var(--border); border-radius: 4px; background: var(--panel-2); display: flex; flex-direction: column; }
+.link-card.current { border-color: var(--accent-border); }
+.link-card header { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-bottom: 1px solid var(--border); }
+.link-card header b { font-size: 13px; font-weight: 500; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.link-card header small { color: var(--text-muted); }
+.link-card .inner { padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; }
+.link-card .group-label { font-size: 10px; color: var(--text-muted); letter-spacing: .06em; text-transform: uppercase; }
+.urls { display: flex; flex-direction: column; gap: 3px; }
+.url-btn { all: unset; cursor: pointer; font-family: var(--mono); font-size: 11px; color: var(--accent); overflow-wrap: anywhere; }
+.url-btn:hover { text-decoration: underline; }
+.url-btn[aria-current="true"] { color: var(--text); background: var(--selected); }
+.all-done { margin-top: 2px; }
+
+/* ── 지도 ── */
+.map-wrap { position: absolute; inset: 0; background: var(--bg); overflow: hidden; cursor: grab; }
+.map-wrap:active { cursor: grabbing; }
+.map-wrap svg { display: block; width: 100%; height: 100%; }
+.graticule { fill: none; stroke: var(--map-land); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.land { fill: var(--map-land-2); }
+.borders { fill: none; stroke: var(--map-boundary); stroke-width: .6; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.pin-other { fill: var(--accent-muted); opacity: .55; cursor: pointer; }
+.pin-other:hover { opacity: 1; }
+.pin-sel { fill: var(--accent); stroke: var(--bg); stroke-width: 2; }
+.pin-sel-ring { fill: none; stroke: var(--accent); stroke-width: 1.5; }
+.pin-orig { fill: none; stroke: var(--changed); stroke-width: 1.5; stroke-dasharray: 3 2; }
+.move-line { stroke: var(--changed); stroke-width: 1.2; stroke-dasharray: 4 3; }
+.map-controls { position: absolute; top: 10px; right: 10px; display: flex; flex-direction: column; border: 1px solid var(--border-strong); border-radius: 4px; overflow: hidden; background: var(--panel); }
+.map-controls button { min-width: 44px; padding: 0 6px; white-space: nowrap; height: 30px; border: 0; border-bottom: 1px solid var(--border); background: none; color: var(--text-2); font-size: 15px; }
+.map-controls button:last-child { border-bottom: 0; }
+.map-controls #zSel, .map-controls #zAll { font-size: 11px; }
+.map-controls button:hover { background: var(--input); }
+.map-callout { position: absolute; padding: 5px 9px; border: 1px solid var(--accent-border); border-radius: 4px; background: var(--panel); font-size: 12px; pointer-events: none; white-space: nowrap; transform: translate(14px, -50%); }
+.map-callout small { display: block; color: var(--text-muted); font-family: var(--mono); font-size: 10px; }
+.map-note { position: absolute; left: 10px; bottom: 8px; color: var(--text-muted); font-size: 11px; pointer-events: none; }
+
+/* ── 시작 화면 · 변경 목록 ── */
+.main#page1 { position: relative; }
+.page-overlay { position: absolute !important; }
+.overlay { position: fixed; inset: 0; background: rgba(3,7,18,.82); display: flex; align-items: center; justify-content: center; padding: 24px; z-index: 10; }
+.dialog { width: min(640px, 100%); max-height: 100%; overflow: auto; background: var(--panel); border: 1px solid var(--border-strong); border-radius: 6px; padding: 22px 24px; display: flex; flex-direction: column; gap: 14px; }
+.dialog h1, .dialog h3 { margin: 0; font-size: 19px; text-wrap: balance; }
+.dialog p { margin: 0; color: var(--text-subtle); max-width: 62ch; }
+.dialog ol { margin: 0; padding-left: 20px; color: var(--text-subtle); display: flex; flex-direction: column; gap: 4px; }
+.dialog code { font-family: var(--mono); font-size: 12px; color: var(--accent); }
+.dialog .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.dialog .err { color: #ff8a8a; font-size: 12px; }
+.edits-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.edits-table th, .edits-table td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--border); vertical-align: top; overflow-wrap: anywhere; }
+.edits-table th { color: var(--text-muted); font-weight: 500; font-size: 11px; }
+.edits-table td.mono { font-family: var(--mono); font-size: 11px; }
+.edits-table .from { color: var(--text-muted); text-decoration: line-through; }
+.edits-table .to { color: var(--changed); }
+.dialog pre { margin: 0; max-height: 240px; overflow: auto; padding: 10px; background: var(--bg); border-radius: 4px; font-family: var(--mono); font-size: 11px; color: var(--text-subtle); }
+
+/* ── 페이지 탭 ── */
+.top .page-tabs { margin: -10px 0; }
+.page-tabs button { padding: 0 14px; font-size: 13px; }
+.page-tools { display: contents; }
+.badge { display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 6px; border-radius: 9px; background: var(--accent-action); font-size: 11px; color: var(--text); text-align: center; }
+
+/* ── 탭 2: 변경 검토 ── */
+.main.cx { grid-template-columns: 380px minmax(0, 1fr); }
+.main.cx .left { min-width: 0; }
+.cx-list { flex: 1; border-bottom: 0; }
+.cx-list .row { align-items: start; padding: 8px 12px; }
+.cx-list .row .dot { margin-top: 5px; }
+.cx-list .row .dot.part { background: linear-gradient(90deg, var(--ok) 50%, transparent 50%); border-color: var(--ok); }
+.cx-list .row .nm { white-space: normal; }
+.cx-list .row .nm b { display: block; font-weight: 500; }
+.cx-list .row .nm small { margin: 0; font-family: var(--mono); }
+.cx-list .row .meta { flex-direction: column; align-items: flex-end; }
+.cx-summary { padding: 10px 12px; border-top: 1px solid var(--border-strong); display: flex; gap: 12px; font-size: 12px; color: var(--text-subtle); font-variant-numeric: tabular-nums; flex-wrap: wrap; }
+.cx-detail { overflow-y: auto; padding: 16px 20px 40px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.cx-detail > * { flex-shrink: 0; }
+.cx-detail h2 { margin: 0; font-size: 19px; text-wrap: balance; }
+.cx-empty { margin: auto; max-width: 640px; display: flex; flex-direction: column; gap: 10px; color: var(--text-subtle); }
+.cx-empty strong { color: var(--text); font-size: 15px; }
+.cx-empty ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.cx-empty code, .cx-box code { font-family: var(--mono); font-size: 12px; color: var(--accent); }
+.cx-empty .err, .cx-warn { color: #ff8a8a; font-size: 12px; }
+.cx-box { border: 1px solid var(--border); border-radius: 4px; background: var(--panel-2); padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.cx-box.warn { border-color: #7a5a14; background: rgba(255,170,0,.06); }
+.cx-box .lbl { font-size: 11px; font-weight: 700; letter-spacing: .06em; color: var(--text-muted); }
+.cx-src { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; font-size: 12px; }
+.cx-llm { color: var(--text-2); white-space: pre-wrap; margin: 0; }
+.cx-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.entity { border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+.entity.error { border-color: #7a1f1f; }
+.entity > header { display: flex; align-items: center; gap: 8px; padding: 7px 10px; background: var(--panel-2); border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 12px; flex-wrap: wrap; }
+.entity > header b { font-family: var(--font); font-weight: 500; font-size: 13px; }
+.entity > header input { width: 15px; height: 15px; accent-color: var(--ok); }
+.entity input:indeterminate, .dchange input:indeterminate { accent-color: var(--text-muted); }
+.entity.undecided { border-color: var(--accent-border); }
+.chip.todo { border-color: var(--accent-border); color: var(--accent); }
+.entity .why { padding: 6px 10px; font-size: 12px; color: var(--text-subtle); border-bottom: 1px solid #2c2c2c; }
+.entity .errs { margin: 0; padding: 6px 10px 6px 28px; color: #ff8a8a; font-size: 12px; border-bottom: 1px solid #2c2c2c; }
+.op { padding: 0 6px; border-radius: 3px; font-size: 10px; font-weight: 700; letter-spacing: .05em; font-family: var(--font); }
+.op.insert { background: #164a1d; color: #7ad685; } .op.update { background: #4a3a10; color: #ffc85a; } .op.delete { background: #4a1616; color: #ff8a8a; }
+.dchange, .dcols { display: grid; grid-template-columns: 30px 150px minmax(0, 1fr) minmax(0, 1fr); border-top: 1px solid #2c2c2c; }
+.dcols { border-top: 0; font-size: 11px; color: var(--text-muted); }
+.dcols span { padding: 4px 8px; } .dcols span:nth-child(n+3) { border-left: 1px solid var(--border); }
+.dchange.off { opacity: .45; }
+.dchange .pick { display: flex; justify-content: center; padding-top: 8px; }
+.dchange .pick input { width: 15px; height: 15px; accent-color: var(--ok); }
+.dchange .fld { padding: 7px 8px; font-family: var(--mono); font-size: 11px; color: var(--text-subtle); display: flex; flex-direction: column; gap: 4px; align-items: flex-start; overflow-wrap: anywhere; }
+.cell { padding: 6px 8px; font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; display: flex; flex-direction: column; gap: 4px; min-width: 0; border-left: 1px solid var(--border); white-space: pre-wrap; }
+.cell.before { background: rgba(220,0,0,.13); color: #ff8a8a; }
+.cell.after { background: rgba(4,176,20,.13); color: #7ad685; }
+.cell.none { background: none; color: var(--text-muted); font-style: italic; }
+.cell.same { background: none; color: var(--text-muted); }
+.cell input, .cell select { width: 100%; padding: 2px 6px; border: 1px solid #1f6b27; border-radius: 3px; background: rgba(0,0,0,.25); color: #7ad685; font-family: var(--mono); font-size: 12px; }
+.cell .note { color: #ffc85a; font-size: 11px; font-family: var(--font); font-style: normal; }
+.cx-todo { margin: 0; padding-left: 18px; color: #ffc85a; font-size: 12px; }
+.cx-note { display: grid; grid-template-columns: 120px 1fr; gap: 4px 10px; margin: 0; font-size: 12px; }
+.cx-note dt { color: var(--text-muted); }
+.cx-note dd { margin: 0; color: var(--text-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+.cx-box textarea { width: 100%; padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--input); resize: vertical; }
+.cx-imgs { display: flex; gap: 10px; flex-wrap: wrap; }
+.cx-imgs figure { margin: 0; display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--text-muted); }
+.cx-imgs img { max-width: 240px; max-height: 160px; border-radius: 4px; border: 1px solid var(--border); }
+
+@media (max-width: 1100px) {
+  :root { --left-w: 380px; }
+}
+@media (max-width: 820px) {
+  body { overflow: auto; }
+  .main { grid-template-columns: 1fr; }
+  .grid { grid-template-columns: 1fr; grid-template-rows: 420px 420px 640px; }
+  #paneWiki, #paneMap, #paneFandom { grid-column: 1; grid-row: auto; border-right: 0; border-bottom: 1px solid var(--border); }
+  .left { min-height: 80vh; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand"><b>시드 검수대</b><span>FPS Loc Atlas · seed</span></div>
+  <div class="tabs page-tabs" role="tablist" aria-label="검수 종류">
+    <button type="button" role="tab" data-page="1" aria-selected="true">1 · 시드 검수</button>
+    <button type="button" role="tab" data-page="2" aria-selected="false">2 · 변경 검토<span class="badge" id="cxBadge" hidden></span></button>
+  </div>
+  <span class="page-tools" data-page="1">
+    <span class="file" id="fileLabel">파일 없음</span>
+    <span class="spacer"></span>
+    <label class="toggle"><input type="checkbox" id="autoOpen" checked> 장소를 고르면 문서 자동으로 열기</label>
+    <div class="meter" title="장소 기준 검수 진행률">
+      <span id="meterText">검수 0 / 0</span>
+      <span class="bar"><i id="meterBar"></i></span>
+    </div>
+    <button class="btn" id="btnEdits" type="button">변경 목록 <span id="editCount">0</span></button>
+    <span class="save-state" id="saveState">저장 안 됨</span>
+    <button class="btn" id="btnSave" type="button" title="어시스턴트·스크립트가 파일을 고쳤으면 다시 읽습니다">파일 다시 읽기</button>
+  </span>
+  <span class="page-tools" data-page="2" hidden>
+    <span class="file" id="cxLabel"></span>
+    <span class="spacer"></span>
+    <span class="save-state" id="cxSave"></span>
+    <button class="btn" id="cxOpen" type="button">data 폴더 열기</button>
+    <button class="btn" id="cxReload" type="button" title="diff를 다시 만든 뒤 누르세요">다시 읽기</button>
+  </span>
+</header>
+
+<div class="main" id="page1">
+  <aside class="left">
+    <div class="list-tools">
+      <input class="search" id="search" type="search" placeholder="이름, id, 국가, 맵 이름으로 찾기" autocomplete="off">
+      <div class="filters" id="filters">
+        <button type="button" data-f="all" aria-pressed="true">전체</button>
+        <button type="button" data-f="todo" aria-pressed="false">미검수</button>
+        <button type="button" data-f="done" aria-pressed="false">검수 완료</button>
+        <button type="button" data-f="edited" aria-pressed="false">수정함</button>
+        <button type="button" data-f="noen" aria-pressed="false">영어 위키 제목 없음</button>
+        <button type="button" data-f="country" aria-pressed="false">국가 단위</button>
+      </div>
+    </div>
+    <div class="list" id="list" role="listbox" aria-label="장소 목록"></div>
+    <div class="list-count" id="listCount"></div>
+    <div class="detail" id="detail"></div>
+  </aside>
+
+  <section class="grid">
+    <div class="pane" id="paneWiki">
+      <div class="pane-head">
+        <div class="tabs" role="tablist" aria-label="위키백과 언어">
+          <button type="button" role="tab" id="tabKo" data-lang="ko" aria-selected="true" aria-controls="layerKo">Wikipedia_ko</button>
+          <button type="button" role="tab" id="tabEn" data-lang="en" aria-selected="false" aria-controls="layerEn">Wikipedia_en</button>
+        </div>
+        <span class="wiki-meta" data-lang="ko"><span class="sub" id="koSub"></span><span id="koStat"></span><a class="btn small" id="koOpen" target="_blank" rel="noopener" hidden>새 탭</a></span>
+        <span class="wiki-meta" data-lang="en" hidden><span class="sub" id="enSub"></span><span id="enStat"></span><a class="btn small" id="enOpen" target="_blank" rel="noopener" hidden>새 탭</a></span>
+      </div>
+      <div class="pane-body">
+        <div class="wiki-layer" id="layerKo" role="tabpanel" aria-labelledby="tabKo"><iframe id="koFrame" title="한국어 위키백과" referrerpolicy="no-referrer" hidden></iframe><div class="pane-empty" id="koEmpty"><strong>한국어 위키백과</strong>장소를 고르면 장소 이름으로 검색해 여기에 엽니다.</div></div>
+        <div class="wiki-layer" id="layerEn" role="tabpanel" aria-labelledby="tabEn" hidden><iframe id="enFrame" title="영어 위키백과" referrerpolicy="no-referrer" hidden></iframe><div class="pane-empty" id="enEmpty"><strong>영어 위키백과</strong>장소를 고르거나 wikipedia_title_en을 누르면 여기에 열립니다.</div></div>
+      </div>
+    </div>
+    <div class="pane" id="paneMap">
+      <div class="pane-head"><span class="label">지도 preview</span><span class="sub" id="mapSub"></span></div>
+      <div class="pane-body"><div class="map-wrap" id="mapWrap"><svg id="mapSvg" aria-label="장소 위치 지도"></svg><div class="map-callout" id="callout" hidden></div><div class="map-controls"><button type="button" id="zIn" aria-label="확대">+</button><button type="button" id="zOut" aria-label="축소">−</button><button type="button" id="zSel" aria-label="선택한 장소로 이동">선택</button><button type="button" id="zAll" aria-label="세계 전체 보기">전체</button></div><div class="map-note" id="mapNote">지도 데이터 불러오는 중</div></div></div>
+    </div>
+    <div class="pane" id="paneFandom">
+      <div class="pane-head"><span class="label">Fandom wiki</span><span class="sub" id="fdSub"></span><a class="btn small" id="fdOpen" target="_blank" rel="noopener" hidden>새 탭</a></div>
+      <div class="pane-body"><iframe id="fdFrame" title="팬덤 위키" referrerpolicy="no-referrer" hidden></iframe><div class="pane-empty" id="fdEmpty"><strong>팬덤 위키</strong>왼쪽 맵 카드의 링크를 누르면 여기에 열립니다.</div></div>
+    </div>
+  </section>
+  <!-- 시작 화면(탭 1 안에만 덮인다) -->
+  <div class="overlay page-overlay" id="startOverlay">
+    <div class="dialog">
+      <h1>data 폴더를 열어 시작하세요</h1>
+      <ol>
+        <li>먼저 <code>npm run atlas -- pull</code>로 DB를 <code>data/atlas.json</code>으로 뽑습니다.</li>
+        <li><b>data 폴더 열기</b>를 누르고 <code>E:\projects\Web\FpsViewer\data</code>를 고릅니다. 쓰기 권한을 물으면 허용합니다.</li>
+        <li>고칠 때마다 <code>atlas.json</code>에 바로 저장됩니다. "원래 값"은 뽑았을 때의 DB 값입니다.</li>
+        <li>다 고쳤으면 <code>npm run atlas -- diff</code> → 탭 2에서 확인 → <code>apply</code>로 반영합니다. 제보 처리 중에 고치면 diff를 다시 만드세요.</li>
+      </ol>
+      <p>폴더 열기는 Chrome·Edge에서 됩니다. 탭 2(변경 검토)와 같은 폴더를 씁니다.</p>
+      <div class="actions">
+        <button class="btn primary" id="btnOpenDir" type="button">data 폴더 열기</button>
+        <button class="btn" id="btnReconnect" type="button" hidden>지난번 폴더 다시 연결</button>
+      </div>
+      <div class="err" id="startErr"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 탭 2: 변경 검토. data/.review/diff.json(작업 파일 대 DB의 차이)을 이전/이후로 보여 주고, 고른 결과를 decisions.json에 저장한다. -->
+<div class="main cx" id="page2" hidden>
+  <aside class="left">
+    <div class="list-tools">
+      <div class="filters" id="cxFilters">
+        <button type="button" data-f="all" aria-pressed="true">전체</button>
+        <button type="button" data-f="todo" aria-pressed="false">미결정</button>
+        <button type="button" data-f="done" aria-pressed="false">결정 끝</button>
+        <button type="button" data-f="flag" aria-pressed="false">주의 표시</button>
+        <button type="button" data-f="error" aria-pressed="false">오류</button>
+      </div>
+      <div class="filters" id="cxKinds">
+        <button type="button" data-k="all" aria-pressed="true">모두</button>
+        <button type="button" data-k="submission" aria-pressed="false">제보</button>
+        <button type="button" data-k="suggestion" aria-pressed="false">수정 제안</button>
+        <button type="button" data-k="game" aria-pressed="false">게임별 변경</button>
+      </div>
+    </div>
+    <div class="list cx-list" id="cxList" role="listbox" aria-label="변경 묶음"></div>
+    <div class="cx-summary" id="cxSummary"></div>
+  </aside>
+  <section class="cx-detail" id="cxDetail">
+    <div class="cx-empty">
+      <strong>data 폴더를 여세요</strong>
+      <ol>
+        <li><code>npm run atlas -- pull</code>로 DB를 <code>data/atlas.json</code>·<code>names.json</code>으로 뽑습니다.</li>
+        <li>제보·수정 제안은 <code>npm run atlas -- inbox</code>, 그 밖의 수정은 두 파일을 직접 고칩니다.</li>
+        <li><code>npm run atlas -- diff</code>로 차이를 만듭니다(<code>data/.review/diff.json</code>).</li>
+        <li><b>data 폴더 열기</b>로 <code>E:\projects\Web\FpsViewer\data</code>를 고르고 변경을 고릅니다. 고를 때마다 <code>.review/decisions.json</code>에 저장됩니다.</li>
+        <li><code>npm run atlas -- apply</code>로 반영합니다(<code>--dry-run</code>은 SQL만).</li>
+      </ol>
+      <span class="err" id="cxErr"></span>
+    </div>
+  </section>
+</div>
+<!-- 변경 목록 -->
+<div class="overlay" id="editsOverlay" hidden>
+  <div class="dialog" style="width:min(920px,100%)">
+    <h3>변경 목록</h3>
+    <p id="editsSummary"></p>
+    <div style="overflow-x:auto"><table class="edits-table" id="editsTable"></table></div>
+    <div class="actions">
+      <button class="btn" id="btnCopy" type="button">JSON 복사</button>
+            <button class="btn" id="btnCloseEdits" type="button">닫기</button>
+    </div>
+    <pre id="editsJson"></pre>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ───────────── 상태 ─────────────
+   data/atlas.json(작업 파일)을 읽어 보여 주고, 고치면 그 파일에 바로 저장한다(브라우저에는 남기지 않음).
+   "원래 값"은 뽑았을 때의 DB 사본(.review/base.json). 반영은 npm run atlas -- diff → 탭 2 → apply.
+   제보 처리 중(.review/worklist.json이 있음)에도 고칠 수 있다(어시스턴트가 채운 것을 손질). 작업 목록과 관계없는 행을 고치면 diff가 경고한다. */
+const ERAS = ['WWI', 'WWII', '냉전', '현대', '근미래', '기타'];
+const EVIDENCE = ['공식', '커뮤니티 추정', '기타'];
+const PRECISION = ['주·도', '국가'];
+
+const S = {
+  seed: null, dir: null, atlas: null, fileText: null, inboxMode: false, base: new Map(),
+  places: [], placeById: new Map(), mapById: new Map(), gameById: new Map(), linksByPlace: new Map(),
+  edits: new Map(),            // key → {table, key, field, from(DB), to(파일)}
+  selected: null, filter: 'all', query: '', fandomUrl: null,
+  saveTimer: null, wikiCache: new Map(),
+};
+
+const $ = (id) => document.getElementById(id);
+function h(tag, attrs, ...kids) {
+  const el = document.createElement(tag);
+  if (attrs) for (const [k, v] of Object.entries(attrs)) {
+    if (v == null || v === false) continue;
+    if (k === 'class') el.className = v;
+    else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+    else if (k === 'dataset') Object.assign(el.dataset, v);
+    else el.setAttribute(k, v === true ? '' : v);
+  }
+  for (const kid of kids.flat()) if (kid != null && kid !== false) el.append(kid.nodeType ? kid : String(kid));
+  return el;
+}
+const linkKey = (mp) => `${mp.map_id}|${mp.place_id}`;
+const editKey = (table, key, field) => `${table}\u0000${key}\u0000${field}`;
+const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+function rowOf(table, key) {
+  if (table === 'places') return S.placeById.get(key);
+  if (table === 'maps') return S.mapById.get(key);
+  if (table === 'games') return S.gameById.get(key);
+  if (table === 'map_places') for (const list of S.linksByPlace.values()) for (const mp of list) if (linkKey(mp) === key) return mp;
+  return null;
+}
+/** DB 값(뽑았을 때). 새로 생긴 행이면 파일 값 */
+function orig(table, key, field) {
+  const k = editKey(table, key, field);
+  if (S.base.has(k)) return S.base.get(k);
+  const r = rowOf(table, key); return r ? r[field] ?? null : null;
+}
+function val(table, key, field) {
+  const e = S.edits.get(editKey(table, key, field));
+  if (e) return e.to;
+  const r = rowOf(table, key); return r ? r[field] ?? null : null;
+}
+function setVal(table, key, field, to) {
+  const from = orig(table, key, field);
+  const k = editKey(table, key, field);
+  if (same(from, to)) S.edits.delete(k);
+  else S.edits.set(k, { table, key, field, from, to });
+  writeField(table, key, field, to);
+  const row = rowOf(table, key); if (row) row[field] = to;
+  onEditsChanged();
+}
+
+/* ───────────── atlas.json ↔ 화면 행 ───────────── */
+const FIELDS = {
+  places: ['name', 'name_en', 'country', 'country_code', 'region', 'admin1_code', 'location_precision', 'lat', 'lng', 'wikipedia_title_en', 'verified'],
+  maps: ['name', 'game_id', 'era', 'wiki_url', 'verified'],
+  map_places: ['evidence_level', 'source_urls', 'note', 'verified'],
+};
+function adapt(atlas) {
+  const places = Object.entries(atlas.places).map(([id, p]) => ({ id, ...Object.fromEntries(FIELDS.places.map((f) => [f, p[f] ?? null])) }));
+  const games = [], maps = [], map_places = [];
+  for (const [gid, g] of Object.entries(atlas.games)) {
+    games.push({ id: gid, name: g.name });
+    for (const [mid, m] of Object.entries(g.maps)) {
+      maps.push({ id: mid, game_id: gid, name: m.name, era: m.era, wiki_url: m.wiki_url, verified: m.verified });
+      for (const [pid, l] of Object.entries(m.places)) map_places.push({ map_id: mid, place_id: pid, evidence_level: l.evidence_level, source_urls: l.sources, note: l.note, verified: l.verified });
+    }
+  }
+  places.sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id, 'ko'));
+  return { places, games, maps, map_places };
+}
+function rowsByKey(seed) {
+  const out = new Map();
+  const put = (table, key, row) => { for (const f of FIELDS[table] || []) out.set(editKey(table, key, f), row[f] ?? null); };
+  for (const p of seed.places) put('places', p.id, p);
+  for (const m of seed.maps) put('maps', m.id, m);
+  for (const mp of seed.map_places) put('map_places', linkKey(mp), mp);
+  return out;
+}
+/** 화면에서 고친 값을 작업 파일 객체에 쓴다 */
+function writeField(table, key, field, v) {
+  const a = S.atlas;
+  if (table === 'places') a.places[key][field] = v;
+  else if (table === 'maps') { const m = rowOf('maps', key); a.games[m.game_id].maps[key][field] = v; }
+  else if (table === 'map_places') {
+    const [mid, pid] = key.split('|');
+    const link = a.games[rowOf('maps', mid).game_id].maps[mid].places[pid];
+    link[field === 'source_urls' ? 'sources' : field] = v ?? (field === 'source_urls' ? [] : null);
+  }
+}
+
+/* ───────────── 불러오기 ───────────── */
+async function readText(dir, path) {
+  const parts = path.split('/');
+  try {
+    for (const p of parts.slice(0, -1)) dir = await dir.getDirectoryHandle(p);
+    return await (await (await dir.getFileHandle(parts.at(-1))).getFile()).text();
+  } catch (e) { if (e.name === 'NotFoundError') return null; throw e; }
+}
+async function openDir(dir) {
+  const perm = await dir.requestPermission({ mode: 'readwrite' });
+  if (perm !== 'granted') throw new Error('폴더 쓰기 권한이 없어 시작할 수 없습니다. 다시 열고 허용을 눌러 주세요.');
+  const text = await readText(dir, 'atlas.json');
+  const baseText = await readText(dir, '.review/base.json');
+  if (!text || !baseText) throw new Error('이 폴더에 atlas.json·.review/base.json이 없습니다. E:\\projects\\Web\\FpsViewer\\data 폴더를 고르고, 먼저 npm run atlas -- pull을 실행하세요.');
+  const atlas = JSON.parse(text);
+  if (atlas.format !== 'fps-atlas-data/1') throw new Error(`알 수 없는 형식: ${atlas.format}`);
+  S.dir = dir; S.atlas = atlas; S.fileText = text;
+  S.inboxMode = !!(await readText(dir, '.review/worklist.json'));
+  const seed = adapt(atlas);
+  S.seed = seed; S.places = seed.places;
+  S.placeById = new Map(seed.places.map((p) => [p.id, p]));
+  S.mapById = new Map(seed.maps.map((m) => [m.id, m]));
+  S.gameById = new Map(seed.games.map((g) => [g.id, g]));
+  S.linksByPlace = new Map();
+  for (const mp of seed.map_places) { if (!S.linksByPlace.has(mp.place_id)) S.linksByPlace.set(mp.place_id, []); S.linksByPlace.get(mp.place_id).push(mp); }
+  // 뽑았을 때의 DB 값과 다른 칸 = 지금 고쳐져 있는 칸
+  S.base = rowsByKey(adapt(JSON.parse(baseText).atlas));
+  S.edits = new Map();
+  for (const [k, v] of rowsByKey(seed)) if (S.base.has(k) && !same(S.base.get(k), v)) { const [table, key, field] = k.split('\u0000'); S.edits.set(k, { table, key, field, from: S.base.get(k), to: v }); }
+  $('fileLabel').textContent = `data/atlas.json · 장소 ${seed.places.length} · 맵 ${seed.maps.length} · 연결 ${seed.map_places.length} · DB ${new Date(atlas.exported_at).toLocaleString('ko-KR')}`;
+  await idbSet('cxdata', dir);
+  start();
+  setSaveState(S.inboxMode ? '제보 처리 중 · 작업 목록과 관계없는 칸을 고치면 diff에서 경고' : S.edits.size ? `고친 칸 ${S.edits.size}개 불러옴` : '고칠 때마다 atlas.json에 저장', S.inboxMode ? 'warn' : 'ok');
+}
+
+function start() {
+  $('startOverlay').hidden = true;
+  initMap();
+  renderList();
+  updateMeter();
+  $('editCount').textContent = S.edits.size;
+  const first = filtered().find((p) => p.id === S.selected) ?? filtered()[0];
+  if (first) select(first.id);
+}
+
+/* ───────────── 저장 ───────────── */
+function setSaveState(text, cls) { const el = $('saveState'); el.textContent = text; el.className = `save-state ${cls || ''}`; }
+/** 파일이 밖에서(어시스턴트·스크립트) 바뀌었으면 덮어쓰지 않는다 */
+async function writeAtlas() {
+  const now = await readText(S.dir, 'atlas.json');
+  if (now !== S.fileText) throw new Error('atlas.json이 밖에서 바뀌었습니다 · "파일 다시 읽기"를 누르세요(지금 고친 칸은 저장되지 않음)');
+  const text = JSON.stringify(S.atlas, null, 2) + '\n';
+  const w = await (await S.dir.getFileHandle('atlas.json')).createWritable();
+  await w.write(text); await w.close();
+  S.fileText = text;
+}
+function onEditsChanged() {
+  $('editCount').textContent = S.edits.size;
+  updateMeter();
+  setSaveState('저장 중…');
+  clearTimeout(S.saveTimer);
+  S.saveTimer = setTimeout(async () => {
+    try { await writeAtlas(); setSaveState(`저장됨 ${new Date().toLocaleTimeString('ko-KR')}`, 'ok'); }
+    catch (e) { setSaveState(e.message, 'warn'); }
+  }, 400);
+}
+function buildEditsDoc() {
+  const edits = [...S.edits.values()].sort((a, b) => (a.table + a.key + a.field).localeCompare(b.table + b.key + b.field));
+  return { file: 'data/atlas.json', db_exported_at: S.atlas?.exported_at, edits };
+}
+
+/* 폴더 핸들 기억(IndexedDB) */
+function idb() { return new Promise((res, rej) => { const r = indexedDB.open('seed-review', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
+async function idbSet(k, v) { try { const db = await idb(); db.transaction('kv', 'readwrite').objectStore('kv').put(v, k); } catch {} }
+async function idbGet(k) { try { const db = await idb(); return await new Promise((res) => { const q = db.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => res(q.result); q.onerror = () => res(null); }); } catch { return null; } }
+
+/* ───────────── 목록 ───────────── */
+function placeEdited(id) {
+  const keys = new Set([`places\u0000${id}`, ...(S.linksByPlace.get(id) || []).flatMap((mp) => [`map_places\u0000${linkKey(mp)}`, `maps\u0000${mp.map_id}`])]);
+  for (const e of S.edits.values()) if (e.field !== 'verified' && keys.has(`${e.table}\u0000${e.key}`)) return true;
+  return false;
+}
+const isDone = (id) => val('places', id, 'verified') === true;
+function haystack(p) {
+  const maps = (S.linksByPlace.get(p.id) || []).map((mp) => { const m = S.mapById.get(mp.map_id); return m ? `${val('maps', m.id, 'name')} ${S.gameById.get(m.game_id)?.name || ''}` : ''; });
+  return [p.id, val('places', p.id, 'name'), val('places', p.id, 'country'), val('places', p.id, 'country_code'), val('places', p.id, 'region'), val('places', p.id, 'wikipedia_title_en'), ...maps].join(' ').toLowerCase();
+}
+function filtered() {
+  const q = S.query.trim().toLowerCase();
+  return S.places.filter((p) => {
+    if (q && !haystack(p).includes(q)) return false;
+    switch (S.filter) {
+      case 'todo': return !isDone(p.id);
+      case 'done': return isDone(p.id);
+      case 'edited': return placeEdited(p.id);
+      case 'noen': return !val('places', p.id, 'wikipedia_title_en');
+      case 'country': return val('places', p.id, 'location_precision') === '국가';
+      default: return true;
+    }
+  });
+}
+function renderList() {
+  const items = filtered();
+  const list = $('list'); list.replaceChildren();
+  for (const p of items) {
+    const n = (S.linksByPlace.get(p.id) || []).length;
+    list.append(h('button', { class: 'row', type: 'button', role: 'option', 'aria-current': S.selected === p.id ? 'true' : 'false', dataset: { id: p.id }, onclick: () => select(p.id) },
+      h('span', { class: `dot${isDone(p.id) ? ' done' : ''}`, title: isDone(p.id) ? '검수 완료' : '미검수' }),
+      h('span', { class: 'nm' }, val('places', p.id, 'name') || p.id, h('small', null, val('places', p.id, 'country_code') || '')),
+      h('span', { class: 'meta' }, placeEdited(p.id) ? h('span', { class: 'edited', title: '수정함' }, '수정') : null, `맵 ${n}`)));
+  }
+  $('listCount').textContent = `${items.length}곳 표시 · 전체 ${S.places.length}곳`;
+  list.querySelector('[aria-current="true"]')?.scrollIntoView({ block: 'nearest' });
+}
+function updateMeter() {
+  if (!S.seed) return;
+  const done = S.places.filter((p) => isDone(p.id)).length;
+  $('meterText').textContent = `검수 ${done} / ${S.places.length}`;
+  $('meterBar').style.width = `${S.places.length ? (done / S.places.length) * 100 : 0}%`;
+}
+
+/* ───────────── 상세 ───────────── */
+function field(table, key, fieldName, opts = {}) {
+  const cur = val(table, key, fieldName);
+  const from = orig(table, key, fieldName);
+  const changed = S.edits.has(editKey(table, key, fieldName));
+  const wrap = h('div', { class: `v${changed ? ' changed' : ''}` });
+  let ctl;
+  const id = `f-${table}-${key}-${fieldName}`.replace(/[^\w-]/g, '_');
+  if (opts.readonly) {
+    ctl = h('input', { type: 'text', id, value: cur ?? '', readonly: true, title: opts.readonlyTitle });
+  } else if (opts.kind === 'select') {
+    ctl = h('select', { id }, ...(cur == null ? [h('option', { value: '' }, '(없음)')] : []), ...opts.options.map((o) => h('option', { value: o, selected: o === cur }, o)));
+    if (cur != null && !opts.options.includes(cur)) ctl.append(h('option', { value: cur, selected: true }, `${cur} (허용 안 됨)`));
+    ctl.addEventListener('change', () => setVal(table, key, fieldName, ctl.value || null) || rerender());
+  } else if (opts.kind === 'bool') {
+    ctl = h('label', { class: 'check' }, h('input', { type: 'checkbox', id, checked: cur === true, onchange: (e) => { setVal(table, key, fieldName, e.target.checked); rerender(); } }), cur === true ? '검수 완료' : '미검수');
+  } else if (opts.kind === 'list') {
+    ctl = h('textarea', { id, rows: Math.max(2, (cur || []).length), spellcheck: 'false' });
+    ctl.value = (cur || []).join('\n');
+    ctl.addEventListener('change', () => { setVal(table, key, fieldName, ctl.value.split('\n').map((s) => s.trim()).filter(Boolean)); rerender(); });
+  } else {
+    const num = opts.kind === 'number';
+    ctl = h('input', { type: num ? 'number' : 'text', id, step: num ? 'any' : null, value: cur ?? '', spellcheck: 'false', autocomplete: 'off' });
+    ctl.addEventListener('change', () => {
+      const raw = ctl.value.trim();
+      const v = raw === '' ? null : num ? Number(raw) : raw;
+      if (num && raw !== '' && !Number.isFinite(v)) { ctl.value = cur ?? ''; return; }
+      setVal(table, key, fieldName, v);
+      rerender();
+    });
+    if (opts.onInput) ctl.addEventListener('input', () => opts.onInput(ctl.value));
+  }
+  wrap.append(h('div', { class: 'ctl' }, ctl, opts.after || null));
+  if (changed && opts.kind !== 'bool') {
+    wrap.append(h('div', { class: 'was' }, `원래 값: ${from == null ? '(없음)' : Array.isArray(from) ? from.join(', ') : from}`,
+      h('button', { type: 'button', onclick: () => { setVal(table, key, fieldName, from); rerender(); } }, '되돌리기')));
+  }
+  if (!changed && (cur == null || cur === '') && opts.emptyHint) wrap.append(h('div', { class: 'empty-hint' }, opts.emptyHint));
+  return wrap;
+}
+function kv(label, node, onLabel) {
+  return [h('div', { class: 'k' }, onLabel ? h('button', { type: 'button', onclick: onLabel, title: '오른쪽에서 보기' }, label) : label), node];
+}
+
+function renderDetail() {
+  const det = $('detail'); det.replaceChildren();
+  const p = S.placeById.get(S.selected);
+  if (!p) { det.append(h('p', { style: 'color:var(--text-muted)' }, '목록에서 장소를 고르세요.')); return; }
+  const id = p.id;
+  const list = filtered();
+  const idx = list.findIndex((x) => x.id === id);
+  const go = (d) => { const n = list[idx + d]; if (n) select(n.id); };
+  const nextTodo = () => { const rest = [...list.slice(idx + 1), ...list.slice(0, idx)]; const n = rest.find((x) => !isDone(x.id)); if (n) select(n.id); };
+
+  det.append(h('div', { class: 'detail-head' },
+    h('h2', null, val('places', id, 'name') || id),
+    h('div', { class: 'nav' },
+      h('button', { class: 'btn small', type: 'button', onclick: () => go(-1), disabled: idx <= 0, title: '이전 (Alt+↑)' }, '이전'),
+      h('button', { class: 'btn small', type: 'button', onclick: () => go(1), disabled: idx < 0 || idx >= list.length - 1, title: '다음 (Alt+↓)' }, '다음'),
+      h('button', { class: 'btn small', type: 'button', onclick: nextTodo, title: '다음 미검수 장소' }, '다음 미검수'))));
+
+  const coordBtn = h('button', { class: 'btn small coord-btn', type: 'button', onclick: () => focusMap(true) }, '지도에서 보기');
+  det.append(h('div', { class: 'section' }, h('div', { class: 'section-title' }, '장소 · 주요 필드'),
+    h('div', { class: 'fields' },
+      kv('id', field('places', id, 'id', { readonly: true, readonlyTitle: '맵 연결이 id로 이어져 있어 여기서 바꾸지 않습니다. 바꿔야 하면 note로 남겨 주세요.' })),
+      kv('name', field('places', id, 'name')),
+      kv('name_en', field('places', id, 'name_en')),
+      kv('country', field('places', id, 'country')),
+      kv('country_code', field('places', id, 'country_code')),
+      kv('region', field('places', id, 'region', { emptyHint: '주·도 없음(국가 단위)' })),
+      kv('lat', field('places', id, 'lat', { kind: 'number' }), () => focusMap(true)),
+      kv('lng', field('places', id, 'lng', { kind: 'number', after: coordBtn }), () => focusMap(true)))));
+
+  const koStat = h('span', { class: 'wikistat', id: 'detKoStat' });
+  const enStat = h('span', { class: 'wikistat', id: 'detEnStat' });
+  det.append(h('div', { class: 'section' }, h('div', { class: 'section-title' }, '장소 · 부가 필드'),
+    h('div', { class: 'fields secondary' },
+      kv('wikipedia_title_en', field('places', id, 'wikipedia_title_en', { after: enStat, emptyHint: '비어 있음' }), () => openWiki('en', true)),
+      kv('location_precision', field('places', id, 'location_precision', { kind: 'select', options: PRECISION })),
+      kv('admin1_code', field('places', id, 'admin1_code')),
+      kv('verified', field('places', id, 'verified', { kind: 'bool' })))));
+  checkWikiStat('ko', koStat); checkWikiStat('en', enStat);
+
+  const links = S.linksByPlace.get(id) || [];
+  const linkSec = h('div', { class: 'section' }, h('div', { class: 'section-title' }, `연결된 맵 ${links.length}개`));
+  for (const mp of links) linkSec.append(linkCard(mp));
+  linkSec.append(h('button', { class: 'btn all-done', type: 'button', onclick: () => markAll(id) }, '이 장소와 연결된 맵·근거 모두 검수 완료로 표시'));
+  det.append(linkSec);
+}
+
+function linkCard(mp) {
+  const m = S.mapById.get(mp.map_id);
+  const g = m ? S.gameById.get(m.game_id) : null;
+  const lk = linkKey(mp);
+  const urls = [...new Set([val('maps', mp.map_id, 'wiki_url'), ...(val('map_places', lk, 'source_urls') || [])].filter(Boolean))];
+  const card = h('div', { class: `link-card${urls.includes(S.fandomUrl) ? ' current' : ''}` },
+    h('header', null, h('b', null, `${g?.name || m?.game_id || '?'} · ${val('maps', mp.map_id, 'name') || mp.map_id}`), h('small', null, val('maps', mp.map_id, 'era') || '')),
+    h('div', { class: 'inner' },
+      h('div', { class: 'group-label' }, '팬덤 위키 링크'),
+      urls.length ? h('div', { class: 'urls' }, ...urls.map((u) => h('button', { class: 'url-btn', type: 'button', 'aria-current': u === S.fandomUrl ? 'true' : 'false', onclick: () => openFandom(u) }, u))) : h('span', { class: 'empty-hint', style: 'font-size:11px;color:var(--warn)' }, '링크 없음'),
+      h('div', { class: 'group-label' }, `맵 · maps`),
+      h('div', { class: 'fields secondary' },
+        kv('id', field('maps', mp.map_id, 'id', { readonly: true })),
+        kv('name', field('maps', mp.map_id, 'name')),
+        kv('game_id', field('maps', mp.map_id, 'game_id', { readonly: true })),
+        kv('era', field('maps', mp.map_id, 'era', { kind: 'select', options: ERAS })),
+        kv('wiki_url', field('maps', mp.map_id, 'wiki_url', { emptyHint: '비어 있음 · 변환할 때 넣지 않는 값(근거 링크로 대신 확인)' })),
+        kv('verified', field('maps', mp.map_id, 'verified', { kind: 'bool' }))),
+      h('div', { class: 'group-label' }, '근거 · map_places'),
+      h('div', { class: 'fields secondary' },
+        kv('evidence_level', field('map_places', lk, 'evidence_level', { kind: 'select', options: EVIDENCE })),
+        kv('source_urls', field('map_places', lk, 'source_urls', { kind: 'list' })),
+        kv('note', field('map_places', lk, 'note')),
+        kv('verified', field('map_places', lk, 'verified', { kind: 'bool' })))));
+  return card;
+}
+
+function markAll(id) {
+  setVal('places', id, 'verified', true);
+  for (const mp of S.linksByPlace.get(id) || []) { setVal('maps', mp.map_id, 'verified', true); setVal('map_places', linkKey(mp), 'verified', true); }
+  rerender();
+}
+
+function rerender() {
+  const scroll = $('detail').scrollTop;
+  renderDetail(); renderList(); drawPins();
+  $('detail').scrollTop = scroll;
+}
+
+function select(id) {
+  S.selected = id;
+  renderList(); renderDetail();
+  $('detail').scrollTop = 0;
+  focusMap(false);
+  if ($('autoOpen').checked) {
+    openWiki('ko', false); openWiki('en', false);
+    const first = (S.linksByPlace.get(id) || []).flatMap((mp) => [val('maps', mp.map_id, 'wiki_url'), ...(val('map_places', linkKey(mp), 'source_urls') || [])]).find(Boolean);
+    if (first) openFandom(first, false);
+  }
+}
+
+/* ───────────── 오른쪽 문서 칸 ───────────── */
+const wikiUrl = (lang, title) => `https://${lang}.m.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, '_')).replace(/%2F/g, '/')}`;
+const wikiSearch = (lang, q) => `https://${lang}.m.wikipedia.org/w/index.php?search=${encodeURIComponent(q)}&ns0=1`;
+function showFrame(prefix, url, subText) {
+  const fr = $(`${prefix}Frame`);
+  if (fr.dataset.url !== url) { fr.src = url; fr.dataset.url = url; }
+  fr.hidden = false; $(`${prefix}Empty`).hidden = true;
+  $(`${prefix}Sub`).textContent = subText;
+  const open = $(`${prefix}Open`); open.href = url; open.hidden = false;
+}
+function englishNameHint(p) {
+  // note "위키 place: Achi Baba, Turkey"에서 원래 영문 장소명을 얻는다.
+  for (const mp of S.linksByPlace.get(p.id) || []) { const m = /위키 place:\s*([^,]+)/.exec(mp.note || ''); if (m) return m[1].trim(); }
+  return p.id.replace(/-[a-z]{3}$/, '').replace(/-/g, ' ');
+}
+function openWiki(lang, fromClick) {
+  const p = S.placeById.get(S.selected); if (!p) return;
+  const title = val('places', p.id, `wikipedia_title_${lang}`);
+  const stat = $(`${lang}Stat`); stat.replaceChildren();
+  if (title) showFrame(lang, wikiUrl(lang, title), title);
+  else {
+    const q = lang === 'ko' ? (val('places', p.id, 'name') || englishNameHint(p)) : englishNameHint(p);
+    showFrame(lang, wikiSearch(lang, q), `제목 없음 · "${q}" 검색`);
+    stat.append(h('span', { class: 'chip warn' }, '제목 없음'));
+  }
+  // 제목이 비어 있는 언어는 탭에 점을 찍어 다른 탭에 있어도 알 수 있게 한다.
+  const tab = $(lang === 'ko' ? 'tabKo' : 'tabEn');
+  tab.querySelector('.tab-dot')?.remove();
+  if (!title) tab.append(h('span', { class: 'tab-dot', title: '제목 없음' }));
+  if (fromClick) switchWiki(lang);
+}
+let wikiLang = 'ko';
+function switchWiki(lang) {
+  wikiLang = lang;
+  for (const l of ['ko', 'en']) {
+    const on = l === lang;
+    $(l === 'ko' ? 'tabKo' : 'tabEn').setAttribute('aria-selected', on ? 'true' : 'false');
+    $(l === 'ko' ? 'layerKo' : 'layerEn').hidden = !on;
+    document.querySelector(`.wiki-meta[data-lang="${l}"]`).hidden = !on;
+  }
+}
+document.querySelector('#paneWiki .tabs').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-lang]'); if (!b) return;
+  if (S.selected && $(`${b.dataset.lang}Frame`).hidden) openWiki(b.dataset.lang, false);
+  switchWiki(b.dataset.lang);
+});
+document.querySelector('#paneWiki .tabs').addEventListener('keydown', (e) => {
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  const next = wikiLang === 'ko' ? 'en' : 'ko';
+  switchWiki(next); $(next === 'ko' ? 'tabKo' : 'tabEn').focus();
+});
+function openFandom(url) {
+  S.fandomUrl = url;
+  showFrame('fd', url, url.replace(/^https?:\/\//, ''));
+  document.querySelectorAll('.url-btn').forEach((b) => b.setAttribute('aria-current', b.textContent === url ? 'true' : 'false'));
+  document.querySelectorAll('.link-card').forEach((c) => c.classList.toggle('current', [...c.querySelectorAll('.url-btn')].some((b) => b.textContent === url)));
+}
+
+/* 위키백과 문서가 실제로 있는지(REST 요약 API, CORS 허용) */
+async function wikiStatus(lang, title) {
+  const k = `${lang}:${title}`;
+  if (S.wikiCache.has(k)) return S.wikiCache.get(k);
+  const pr = fetch(`https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title.replace(/ /g, '_'))}`)
+    .then(async (r) => {
+      if (r.status === 404) return { kind: 'missing' };
+      if (!r.ok) return { kind: 'unknown' };
+      const j = await r.json();
+      const canonical = (j.titles?.normalized || j.title || '').replace(/_/g, ' ');
+      if (j.type === 'disambiguation') return { kind: 'disambig' };
+      if (canonical && canonical !== title.replace(/_/g, ' ')) return { kind: 'redirect', to: canonical };
+      return { kind: 'ok' };
+    })
+    .catch(() => ({ kind: 'unknown' }));
+  S.wikiCache.set(k, pr);
+  return pr;
+}
+async function checkWikiStat(lang, el) {
+  const id = S.selected; const title = val('places', id, `wikipedia_title_${lang}`);
+  if (!title) return;
+  const s = await wikiStatus(lang, title);
+  if (S.selected !== id || !el.isConnected) return;
+  const chip = { ok: ['ok', '문서 있음'], missing: ['bad', '문서 없음'], disambig: ['warn', '동음이의 문서'], redirect: ['warn', `넘겨주기 → ${s.to}`], unknown: ['', '확인 못 함'] }[s.kind];
+  el.replaceChildren(h('span', { class: `chip ${chip[0]}`, title: '위키백과 API로 확인한 결과' }, chip[1]));
+  const head = $(`${lang}Stat`); head.replaceChildren(h('span', { class: `chip ${chip[0]}` }, chip[1]));
+}
+
+/* ───────────── 지도 (src/features/atlas/WorldMap.tsx와 같은 투영·색) ───────────── */
+const M = { ready: false, topo: null, svg: null, g: null, pins: null, zoom: null, t: null, projection: null, w: 0, h: 0 };
+const PAD = { top: 24, right: 24, bottom: 24, left: 24 };
+const FOCUS_ZOOM = 6;
+function makeProjection(w, h) {
+  return d3.geoMercator().fitExtent([[PAD.left, PAD.top], [Math.max(PAD.left + 1, w - PAD.right), Math.max(PAD.top + 1, h - PAD.bottom)]], { type: 'MultiPoint', coordinates: [[-180, -58], [180, 82]] });
+}
+function graticule(projection, w, h) {
+  const x0 = projection([-180, 0])[0], x1 = projection([180, 0])[0];
+  const step = ((x1 - x0) / 360) * 30; const lines = [];
+  for (let lat = -80; lat <= 80; lat += 20) { const p = projection([0, lat]); lines.push(`M${-w},${p[1]}H${w * 2}`); }
+  for (let x = x0 - Math.ceil(x0 / step) * step; x <= w; x += step) lines.push(`M${x},${-h}V${h * 2}`);
+  return lines.join('');
+}
+function initMap() {
+  if (M.svg) return;
+  if (!window.d3 || !window.topojson) { $('mapNote').textContent = '지도 라이브러리를 불러오지 못했습니다(인터넷 연결 확인). 지도 없이 검수는 계속할 수 있습니다.'; return; }
+  M.t = d3.zoomIdentity;
+  M.svg = d3.select('#mapSvg');
+  M.g = M.svg.append('g');
+  M.pins = M.svg.append('g');
+  M.zoom = d3.zoom().scaleExtent([1, 40]).on('zoom', (e) => { M.t = e.transform; M.g.attr('transform', M.t); drawPins(); });
+  d3.select('#mapWrap').call(M.zoom).on('dblclick.zoom', null);
+  $('zIn').onclick = () => d3.select('#mapWrap').transition().duration(200).call(M.zoom.scaleBy, 1.8);
+  $('zOut').onclick = () => d3.select('#mapWrap').transition().duration(200).call(M.zoom.scaleBy, 1 / 1.8);
+  $('zAll').onclick = () => d3.select('#mapWrap').transition().duration(300).call(M.zoom.transform, d3.zoomIdentity);
+  $('zSel').onclick = () => focusMap(true);
+  new ResizeObserver(() => layoutMap()).observe($('mapWrap'));
+  fetch('https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-50m.json')
+    .then((r) => r.json())
+    .then((topo) => { M.topo = topo; M.ready = true; $('mapNote').textContent = '경계: Natural Earth (world-atlas 50m) · 휠로 확대, 끌어서 이동'; layoutMap(true); })
+    .catch(() => { $('mapNote').textContent = '지도 데이터를 불러오지 못했습니다(인터넷 연결 확인). 핀 위치는 계속 표시합니다.'; layoutMap(true); });
+}
+function layoutMap(force) {
+  const r = $('mapWrap').getBoundingClientRect();
+  const w = Math.round(r.width), hgt = Math.round(r.height);
+  if (!w || !hgt || (!force && w === M.w && hgt === M.h)) return;
+  M.w = w; M.h = hgt;
+  M.projection = makeProjection(w, hgt);
+  M.zoom.translateExtent([[0, 0], [w, hgt]]).extent([[0, 0], [w, hgt]]);
+  M.g.selectAll('*').remove();
+  M.g.append('path').attr('class', 'graticule').attr('d', graticule(M.projection, w, hgt));
+  if (M.topo) {
+    const path = d3.geoPath(M.projection);
+    M.g.append('path').attr('class', 'land').attr('d', path(topojson.feature(M.topo, M.topo.objects.land)));
+    M.g.append('path').attr('class', 'borders').attr('d', path(topojson.mesh(M.topo, M.topo.objects.countries, (a, b) => a !== b)));
+  }
+  M.g.attr('transform', M.t);
+  drawPins();
+  if (S.selected) focusMap(false, true);
+}
+function screen(lng, lat) { const p = M.projection([lng, lat]); return p ? M.t.apply(p) : null; }
+function drawPins() {
+  if (!M.projection || !S.seed) return;
+  const sel = S.selected;
+  const others = S.places.filter((p) => p.id !== sel).map((p) => ({ p, xy: screen(+val('places', p.id, 'lng'), +val('places', p.id, 'lat')) })).filter((d) => d.xy);
+  M.pins.selectAll('*').remove();
+  M.pins.selectAll('circle.pin-other').data(others).join('circle').attr('class', 'pin-other')
+    .attr('cx', (d) => d.xy[0]).attr('cy', (d) => d.xy[1]).attr('r', 3)
+    .on('click', (e, d) => { e.stopPropagation(); select(d.p.id); })
+    .append('title').text((d) => `${val('places', d.p.id, 'name')} · ${val('places', d.p.id, 'country')}`);
+  const callout = $('callout');
+  if (!sel) { callout.hidden = true; return; }
+  const lat = val('places', sel, 'lat'), lng = val('places', sel, 'lng');
+  const oLat = orig('places', sel, 'lat'), oLng = orig('places', sel, 'lng');
+  const now = Number.isFinite(lat) && Number.isFinite(lng) ? screen(lng, lat) : null;
+  const was = (lat !== oLat || lng !== oLng) && Number.isFinite(oLat) && Number.isFinite(oLng) ? screen(oLng, oLat) : null;
+  if (was && now) M.pins.append('line').attr('class', 'move-line').attr('x1', was[0]).attr('y1', was[1]).attr('x2', now[0]).attr('y2', now[1]);
+  if (was) M.pins.append('circle').attr('class', 'pin-orig').attr('cx', was[0]).attr('cy', was[1]).attr('r', 6).append('title').text(`원래 좌표 ${oLat}, ${oLng}`);
+  if (now) {
+    M.pins.append('circle').attr('class', 'pin-sel-ring').attr('cx', now[0]).attr('cy', now[1]).attr('r', 11);
+    M.pins.append('circle').attr('class', 'pin-sel').attr('cx', now[0]).attr('cy', now[1]).attr('r', 6);
+    callout.hidden = false;
+    callout.style.left = `${now[0]}px`; callout.style.top = `${now[1]}px`;
+    callout.replaceChildren(document.createTextNode(`${val('places', sel, 'name') || sel}${val('places', sel, 'region') ? ` · ${val('places', sel, 'region')}` : ''}`), h('small', null, `${lat}, ${lng}${was ? '  (원래 위치는 점선)' : ''}`));
+  } else callout.hidden = true;
+  $('mapSub').textContent = now ? `${lat}, ${lng}` : '좌표 없음';
+}
+function focusMap(animate, keepZoom) {
+  if (!M.projection || !S.selected) { drawPins(); return; }
+  const lat = val('places', S.selected, 'lat'), lng = val('places', S.selected, 'lng');
+  const p = Number.isFinite(lat) && Number.isFinite(lng) ? M.projection([lng, lat]) : null;
+  if (!p) { drawPins(); return; }
+  const k = keepZoom ? Math.max(M.t.k, 2) : Math.max(M.t.k, FOCUS_ZOOM);
+  const t = d3.zoomIdentity.translate(M.w / 2 - k * p[0], M.h / 2 - k * p[1]).scale(k);
+  const target = d3.select('#mapWrap');
+  if (animate) target.transition().duration(450).call(M.zoom.transform, t); else target.call(M.zoom.transform, t);
+}
+
+/* ───────────── 변경 목록 ───────────── */
+function renderEditsDialog() {
+  const doc = buildEditsDoc();
+  $('editsSummary').textContent = `뽑았을 때의 DB 값과 다른 칸 ${doc.edits.length}개. atlas.json에 저장돼 있고, diff → 탭 2 → apply로 반영합니다.`;
+  const t = $('editsTable'); t.replaceChildren();
+  t.append(h('tr', null, h('th', null, '대상'), h('th', null, '필드'), h('th', null, '원래 값'), h('th', null, '새 값'), h('th', null, '')));
+  const fmt = (v) => v == null ? '(없음)' : Array.isArray(v) ? v.join('\n') : String(v);
+  for (const e of doc.edits) {
+    const placeId = e.table === 'places' ? e.key : e.table === 'map_places' ? e.key.split('|')[1] : [...S.linksByPlace.entries()].find(([, l]) => l.some((mp) => mp.map_id === e.key))?.[0];
+    t.append(h('tr', null,
+      h('td', { class: 'mono' }, h('button', { class: 'url-btn', type: 'button', onclick: () => { $('editsOverlay').hidden = true; if (placeId) select(placeId); } }, `${e.table} · ${e.key}`)),
+      h('td', { class: 'mono' }, e.field),
+      h('td', { class: 'from' }, fmt(e.from)),
+      h('td', { class: 'to' }, fmt(e.to)),
+      h('td', null, h('button', { class: 'btn small', type: 'button', onclick: () => { setVal(e.table, e.key, e.field, e.from); renderEditsDialog(); rerender(); } }, '되돌리기'))));
+  }
+  if (!doc.edits.length) t.append(h('tr', null, h('td', { colspan: 5, style: 'color:var(--text-muted)' }, '아직 바꾼 값이 없습니다.')));
+  $('editsJson').textContent = JSON.stringify(doc, null, 2);
+}
+
+/* ───────────── 이벤트 ───────────── */
+$('search').addEventListener('input', (e) => { S.query = e.target.value; renderList(); });
+$('filters').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-f]'); if (!b) return;
+  S.filter = b.dataset.f;
+  $('filters').querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
+  renderList();
+});
+$('btnEdits').onclick = () => { renderEditsDialog(); $('editsOverlay').hidden = false; };
+$('btnCloseEdits').onclick = () => { $('editsOverlay').hidden = true; };
+$('editsOverlay').addEventListener('click', (e) => { if (e.target === e.currentTarget) e.currentTarget.hidden = true; });
+$('btnCopy').onclick = async () => {
+  const text = $('editsJson').textContent;
+  try { await navigator.clipboard.writeText(text); $('btnCopy').textContent = '복사했습니다'; }
+  catch { const r = document.createRange(); r.selectNodeContents($('editsJson')); getSelection().removeAllRanges(); getSelection().addRange(r); $('btnCopy').textContent = '선택됨 · Ctrl+C'; }
+  setTimeout(() => { $('btnCopy').textContent = 'JSON 복사'; }, 1800);
+};
+$('btnSave').onclick = async () => { if (!S.dir) return; try { await openDir(S.dir); } catch (e) { setSaveState(e.message, 'warn'); } };
+document.addEventListener('keydown', (e) => {
+  if (!S.seed || !e.altKey) return;
+  const list = filtered(); const i = list.findIndex((x) => x.id === S.selected);
+  if (e.key === 'ArrowDown' && list[i + 1]) { e.preventDefault(); select(list[i + 1].id); }
+  if (e.key === 'ArrowUp' && list[i - 1]) { e.preventDefault(); select(list[i - 1].id); }
+});
+
+const startErr = (e) => { $('startErr').textContent = e.message || String(e); };
+$('btnOpenDir').onclick = async () => {
+  if (!window.showDirectoryPicker) { startErr(new Error('이 브라우저는 폴더 열기를 지원하지 않습니다. Chrome이나 Edge로 여세요.')); return; }
+  try { await openDir(await window.showDirectoryPicker({ id: 'fps-data', mode: 'readwrite' })); }
+  catch (e) { if (e.name !== 'AbortError') startErr(e); }
+};
+$('btnReconnect').onclick = async () => { try { await openDir(await idbGet('cxdata')); } catch (e) { startErr(e); } };
+idbGet('cxdata').then((d) => { if (d && d.requestPermission) { $('btnReconnect').hidden = false; $('btnReconnect').textContent = `지난번 폴더 다시 연결 (${d.name})`; } });
+
+/* ───────────── 페이지 탭 ───────────── */
+function showPage(n) {
+  document.querySelectorAll('.page-tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.page === n)));
+  document.querySelectorAll('.page-tools').forEach((el) => { el.hidden = el.dataset.page !== n; });
+  $('page1').hidden = n !== '1'; $('page2').hidden = n !== '2';
+  // 시드 시작 화면은 탭 1에서만 가린다
+  $('startOverlay').hidden = n !== '1' || !!S.seed;
+  try { localStorage.setItem('seed-review:page', n); } catch {}
+}
+document.querySelectorAll('.page-tabs button').forEach((b) => b.addEventListener('click', () => showPage(b.dataset.page)));
+try { if (localStorage.getItem('seed-review:page') === '2') showPage('2'); } catch {}
+</script>
+
+<script>
+'use strict';
+/* ───────────── 탭 2: 변경 검토 ─────────────
+   흐름·형식: docs/data-workflow.md. data/.review/diff.json은 scripts/atlas/diff.ts가 만든다.
+   이전 = diff 때 읽은 DB 값, 이후 = 작업 파일 값. 고른 결과는 .review/decisions.json에 저장하고,
+   반영은 npm run atlas -- apply가 한다. */
+const CX_ENUMS = { era: ['WWI', 'WWII', '냉전', '현대', '근미래', '기타'], evidence_level: ['공식', '커뮤니티 추정', '기타'], location_precision: ['주·도', '국가'] };
+const CX_NUMBERS = ['lat', 'lng', 'release_year'];
+const CX_READONLY = ['game_id', 'verified', 'screenshot', 'photo', 'commons', 'screenshot_path', 'screenshot_thumb_path', 'screenshot_credit', 'photo_path', 'photo_thumb_path', 'photo_credit', 'commons_file', 'commons_author', 'commons_license'];
+const CX_TABLE = { games: '게임', maps: '맵', places: '장소', map_places: '맵↔장소 연결', map_place_sources: '근거 출처', game_aliases: '게임 별칭', map_aliases: '맵 별칭' };
+const CX_KIND = { submission: '제보', suggestion: '수정 제안', game: '게임' };
+const OP_LABEL = { insert: '새로 추가', update: '수정', delete: '삭제' };
+
+const CX = { dir: null, diff: null, dec: null, byId: new Map(), sel: null, filter: 'all', kind: 'all', timer: null };
+const CX_EMPTY = $('cxDetail').innerHTML;
+
+const cxFmt = (v) => v == null || v === '' ? '(없음)' : typeof v === 'object' ? Object.entries(v).map(([k, x]) => `${k}: ${x ?? '(없음)'}`).join('\n') : String(v);
+const cxUnit = (id) => CX.byId.get(id);
+/** 결정할 때 본 내용(이전·이후 값). diff를 다시 만들었을 때 이게 같은 단위만 결정을 이어받는다. */
+const cxSig = (u) => JSON.stringify([u.op, u.field, u.before ?? null, u.after ?? null]);
+const cxDec = (id) => (CX.dec.units[id] ??= {});
+const cxKindOf = (g) => g.kind === 'item' ? g.item.kind : 'game';
+function cxStats(g) {
+  let picked = 0, off = 0, todo = 0, errors = 0;
+  for (const id of g.units) {
+    const u = cxUnit(id);
+    if (u.errors.length) { errors++; continue; }
+    const p = CX.dec.units[id]?.pick;
+    p === true ? picked++ : p === false ? off++ : todo++;
+  }
+  return { picked, off, todo, errors };
+}
+const cxWarn = (g) => g.units.some((id) => { const u = cxUnit(id); return u.flags.length || u.conflict; }) || (g.item?.todo?.length > 0);
+
+/* ── 고르기(의존 관계 유지) ── */
+function cxSetPick(id, v) {
+  const u = cxUnit(id);
+  if (!u || u.errors.length) return;
+  cxDec(id).pick = v;
+  cxDec(id).sig = cxSig(u);
+  if (v) for (const r of u.requires) if (CX.dec.units[r]?.pick !== true) cxSetPick(r, true);
+  // 이 단위를 필요로 하는 단위는 함께 뺀다
+  if (!v) for (const other of CX.diff.units) if (other.requires.includes(id) && CX.dec.units[other.id]?.pick === true) cxSetPick(other.id, false);
+}
+
+/* ── 파일 ── */
+async function cxRead(path) {
+  let dir = CX.dir;
+  const parts = path.split('/');
+  try {
+    for (const p of parts.slice(0, -1)) dir = await dir.getDirectoryHandle(p);
+    return await (await (await dir.getFileHandle(parts.at(-1))).getFile()).text();
+  } catch (e) { if (e.name === 'NotFoundError') return null; throw e; }
+}
+async function cxImageUrl(path) {
+  let dir = CX.dir;
+  const parts = path.split('/');
+  try { for (const p of parts.slice(0, -1)) dir = await dir.getDirectoryHandle(p); return URL.createObjectURL(await (await dir.getFileHandle(parts.at(-1))).getFile()); }
+  catch { return null; }
+}
+async function cxConnect(dir) {
+  if ((await dir.requestPermission({ mode: 'readwrite' })) !== 'granted') throw new Error('폴더 쓰기 권한이 필요합니다.');
+  CX.dir = dir;
+  await idbSet('cxdata', dir);
+  if (!S.dir) openDir(dir).catch(() => {});
+  $('cxOpen').textContent = `data 폴더 (${dir.name})`;
+  await cxLoad();
+}
+function cxShowError(msg) {
+  CX.diff = null; renderCx();
+  $('cxErr').textContent = msg;
+}
+
+async function cxLoad() {
+  const text = await cxRead('.review/diff.json');
+  if (!text) return cxShowError(`${CX.dir.name}/.review/diff.json이 없습니다. npm run atlas -- diff를 먼저 실행하세요(이 폴더가 data 폴더가 맞는지도 확인).`);
+  const diff = JSON.parse(text);
+  if (diff.format !== 'fps-atlas-diff/1') return cxShowError(`알 수 없는 형식: ${diff.format}`);
+  CX.diff = diff;
+  CX.byId = new Map(diff.units.map((u) => [u.id, u]));
+  const saved = JSON.parse((await cxRead('.review/decisions.json')) || 'null');
+  let note = '';
+  if (saved && saved.diff_created_at === diff.created_at) CX.dec = saved;
+  else {
+    CX.dec = { format: 'fps-atlas-decisions/1', diff_created_at: diff.created_at, decided_at: null, units: {}, items: {} };
+    // diff를 다시 만들었으면, 내용(이전·이후 값)이 그대로인 단위의 결정만 이어받는다.
+    // 내용이 바뀐 단위는 새로 봐야 하므로 미결정으로 되돌린다.
+    if (saved) {
+      let kept = 0, reset = 0;
+      for (const [id, d] of Object.entries(saved.units || {})) {
+        const u = CX.byId.get(id);
+        if (u && !u.errors.length && d.sig === cxSig(u)) { CX.dec.units[id] = d; kept++; } else reset++;
+      }
+      CX.dec.items = saved.items || {};
+      note = `diff를 새로 만들어 결정 ${kept}건을 이어받고, 내용이 바뀌었거나 없어진 ${reset}건은 미결정으로 되돌렸습니다.`;
+    }
+  }
+  const n = diff.units.length;
+  $('cxLabel').textContent = `차이 ${n}건 · DB 읽은 시각 ${new Date(diff.created_at).toLocaleString('ko-KR')}`;
+  CX.sel = diff.groups.some((g) => g.id === CX.sel) ? CX.sel : diff.groups[0]?.id;
+  cxSetSave(note || (saved ? 'decisions.json 불러옴' : ''), note ? 'warn' : 'ok');
+  renderCx();
+}
+function cxSetSave(text, cls) { const el = $('cxSave'); el.textContent = text; el.className = `save-state ${cls || ''}`; }
+function cxChanged() {
+  CX.dec.decided_at = new Date().toISOString();
+  renderCx();
+  cxSetSave('저장 중…');
+  clearTimeout(CX.timer);
+  CX.timer = setTimeout(async () => {
+    try {
+      const dir = await CX.dir.getDirectoryHandle('.review');
+      const w = await (await dir.getFileHandle('decisions.json', { create: true })).createWritable();
+      await w.write(JSON.stringify(CX.dec, null, 2) + '\n'); await w.close();
+      cxSetSave(`저장됨 ${new Date().toLocaleTimeString('ko-KR')}`, 'ok');
+    } catch (e) { cxSetSave(`저장 실패: ${e.message}`, 'warn'); }
+  }, 300);
+}
+
+/* ── 목록 ── */
+function cxVisible() {
+  return CX.diff.groups.filter((g) => {
+    if (CX.kind !== 'all' && cxKindOf(g) !== CX.kind) return false;
+    const st = cxStats(g);
+    switch (CX.filter) {
+      case 'todo': return st.todo > 0 || (g.kind === 'item' && !g.units.length);
+      case 'done': return st.todo === 0;
+      case 'flag': return cxWarn(g);
+      case 'error': return st.errors > 0;
+      default: return true;
+    }
+  });
+}
+function renderCx() {
+  const list = $('cxList'); list.replaceChildren();
+  if (!CX.diff) { $('cxSummary').textContent = ''; $('cxBadge').hidden = true; $('cxDetail').innerHTML = CX_EMPTY; return; }
+  for (const g of cxVisible()) {
+    const st = cxStats(g);
+    list.append(h('button', { class: 'row', type: 'button', role: 'option', 'aria-current': String(CX.sel === g.id), onclick: () => { CX.sel = g.id; renderCx(); $('cxDetail').scrollTop = 0; } },
+      h('span', { class: `dot${st.todo === 0 ? ' done' : st.picked + st.off ? ' part' : ''}` }),
+      h('span', { class: 'nm' }, h('b', null, g.title), h('small', null, `${CX_KIND[cxKindOf(g)]}${g.kind === 'item' ? ` ${g.item.id}` : ''} · 변경 ${g.units.length}`)),
+      h('span', { class: 'meta' }, `${st.picked} 채택 · ${st.todo} 미결정`,
+        st.errors ? h('span', { class: 'chip bad' }, `오류 ${st.errors}`) : null,
+        cxWarn(g) ? h('span', { class: 'chip warn' }, '주의') : null)));
+  }
+  // 같은 단위가 여러 묶음(같은 내용의 제보)에 나올 수 있어 단위 기준으로 센다
+  const tot = cxStats({ units: CX.diff.units.map((u) => u.id) });
+  $('cxSummary').replaceChildren(h('span', null, `채택 ${tot.picked}`), h('span', null, `제외 ${tot.off}`), h('span', null, `미결정 ${tot.todo}`),
+    ...(tot.errors ? [h('span', { style: 'color:#ff8a8a' }, `오류 ${tot.errors}`)] : []),
+    h('span', { style: 'flex-basis:100%;color:var(--text-muted)' }, '채택한 것만 반영합니다. 다 고르면 npm run atlas -- apply'));
+  const undecided = CX.diff.groups.filter((g) => cxStats(g).todo > 0).length;
+  $('cxBadge').hidden = !undecided; $('cxBadge').textContent = undecided;
+  renderCxDetail();
+}
+
+/* ── 상세 ── */
+function cxInput(field, value, onChange) {
+  if (CX_ENUMS[field]) {
+    const s = h('select', null, ...(value == null ? [h('option', { value: '' }, '(고르세요)')] : []), ...CX_ENUMS[field].map((o) => h('option', { value: o, selected: o === value }, o)));
+    s.addEventListener('change', () => s.value && onChange(s.value));
+    return s;
+  }
+  const num = CX_NUMBERS.includes(field);
+  const inp = h('input', { type: num ? 'number' : 'text', step: num ? 'any' : null, value: value ?? '', spellcheck: 'false', autocomplete: 'off', placeholder: '(없음)' });
+  inp.addEventListener('change', () => {
+    const raw = inp.value.trim();
+    const v = raw === '' ? null : num ? Number(raw) : raw;
+    if (num && v != null && !Number.isFinite(v)) { inp.value = value ?? ''; return; }
+    onChange(v);
+  });
+  return inp;
+}
+function cxCheckbox(pick, disabled, onChange) {
+  const cb = h('input', { type: 'checkbox', checked: pick === true, disabled, title: '반영할 것만 체크' });
+  cb.indeterminate = pick === undefined;
+  cb.addEventListener('change', () => onChange(cb.checked));
+  return cb;
+}
+const cxMapLink = (lat, lng) => lat != null && lng != null ? h('a', { href: `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=11/${lat}/${lng}`, target: '_blank', rel: 'noopener', class: 'note' }, '지도에서 보기') : null;
+
+function cxRowCard(rowUnits) {
+  const u0 = rowUnits[0];
+  const keyText = Object.values(u0.key).join(' · ');
+  const errs = [...new Set(rowUnits.flatMap((u) => u.errors))];
+  const flags = [...new Set(rowUnits.flatMap((u) => u.flags))];
+  const conflicts = [...new Set(rowUnits.map((u) => u.conflict).filter(Boolean))];
+  const whole = u0.op !== 'update';
+  const d0 = whole ? cxDec(u0.id) : null;
+  const undecided = !errs.length && rowUnits.some((u) => CX.dec.units[u.id]?.pick === undefined);
+  const header = h('header', null,
+    whole ? cxCheckbox(d0.pick, errs.length > 0, (v) => { cxSetPick(u0.id, v); cxChanged(); }) : null,
+    undecided ? h('span', { class: 'chip todo' }, '미결정') : null,
+    h('span', { class: `op ${u0.op}` }, OP_LABEL[u0.op]),
+    h('b', null, CX_TABLE[u0.table] || u0.table), keyText,
+    ...flags.map((f) => h('span', { class: 'chip warn' }, f)),
+    ...conflicts.map((c) => h('span', { class: 'chip bad' }, `DB 충돌 · ${c}`)),
+    u0.requires.length ? h('span', { class: 'chip', title: u0.requires.join('\n') }, `함께 반영: ${u0.requires.length}`) : null);
+  const box = h('div', { class: `entity${errs.length ? ' error' : ''}${undecided ? ' undecided' : ''}` }, header);
+  if (errs.length) box.append(h('ul', { class: 'errs' }, ...errs.map((e) => h('li', null, e))));
+  box.append(h('div', { class: 'dcols' }, h('span'), h('span', null, '항목'), h('span', null, '이전 (DB)'), h('span', null, u0.op === 'delete' ? '이후' : '이후 (고칠 수 있음)')));
+  const row = (pickNode, field, beforeCell, afterCell, off) => h('div', { class: `dchange${off ? ' off' : ''}` }, h('div', { class: 'pick' }, pickNode), h('div', { class: 'fld' }, field), beforeCell, afterCell);
+
+  if (u0.op === 'insert') {
+    const after = u0.after || {};
+    const fields = Object.keys(after).length ? Object.keys(after) : ['(키만)'];
+    for (const f of fields) {
+      if (f === '(키만)') { box.append(row(null, Object.keys(u0.key).at(-1), h('div', { class: 'cell before none' }, '(없음 · 새로 추가)'), h('div', { class: 'cell after' }, Object.values(u0.key).at(-1)), d0.pick === false)); continue; }
+      const orig = after[f];
+      const cur = d0.value && f in d0.value ? d0.value[f] : orig;
+      const editable = !errs.length && !CX_READONLY.includes(f) && !(typeof orig === 'string' && orig.startsWith('submission:'));
+      const cell = h('div', { class: 'cell after' },
+        editable ? cxInput(f, cur, (v) => { d0.value ??= {}; if (JSON.stringify(v) === JSON.stringify(orig)) delete d0.value[f]; else d0.value[f] = v; if (d0.pick === undefined) cxSetPick(u0.id, true); cxChanged(); }) : cxFmt(cur),
+        JSON.stringify(cur) !== JSON.stringify(orig) ? h('span', { class: 'note' }, `직접 고침 · 파일 값: ${cxFmt(orig)}`) : null,
+        f === 'lng' ? cxMapLink(d0.value?.lat ?? after.lat, cur) : null);
+      box.append(row(null, f, h('div', { class: 'cell before none' }, '(없음 · 새로 추가)'), cell, d0.pick === false));
+    }
+  } else if (u0.op === 'update') {
+    for (const u of rowUnits) {
+      const d = cxDec(u.id);
+      const cur = 'value' in d ? d.value : u.after;
+      const editable = !u.errors.length && !CX_READONLY.includes(u.field);
+      const cell = h('div', { class: `cell after${d.pick === false ? ' same' : ''}` },
+        editable ? cxInput(u.field, cur, (v) => { if (JSON.stringify(v) === JSON.stringify(u.after)) delete d.value; else d.value = v; if (d.pick === undefined) cxSetPick(u.id, true); cxChanged(); }) : cxFmt(cur),
+        'value' in d ? h('span', { class: 'note' }, `직접 고침 · 파일 값: ${cxFmt(u.after)}`) : null,
+        u.flags.length ? h('span', { class: 'note' }, u.flags.join(' · ')) : null);
+      box.append(row(cxCheckbox(d.pick, u.errors.length > 0, (v) => { cxSetPick(u.id, v); cxChanged(); }), u.field,
+        h('div', { class: 'cell before' }, cxFmt(u.before), u.conflict ? h('span', { class: 'note' }, `! ${u.conflict}`) : null), cell, d.pick === false));
+    }
+  } else {
+    const before = u0.before || {};
+    const fields = Object.keys(before).length ? Object.keys(before) : [Object.keys(u0.key).at(-1)];
+    for (const f of fields) box.append(row(null, f, h('div', { class: 'cell before' }, cxFmt(f in before ? before[f] : u0.key[f])), h('div', { class: 'cell after none' }, '(삭제)'), d0.pick === false));
+    if (u0.table === 'map_places') box.append(h('div', { class: 'why' }, '연결을 지우면 그 근거 출처도 함께 지워집니다.'));
+  }
+  return box;
+}
+
+async function renderCxDetail() {
+  const det = $('cxDetail');
+  const g = CX.diff.groups.find((x) => x.id === CX.sel);
+  det.replaceChildren();
+  if (!g) { det.append(h('p', { style: 'color:var(--text-muted)' }, CX.diff.groups.length ? '왼쪽에서 묶음을 고르세요.' : '차이가 없습니다. 파일을 고친 뒤 diff를 다시 만드세요.')); return; }
+  const it = g.item;
+  det.append(h('h2', null, g.title));
+  if (it?.todo?.length) det.append(h('div', { class: 'cx-box warn' }, h('span', { class: 'lbl' }, '어시스턴트가 아직 끝내지 않은 일'), h('ul', { class: 'cx-todo' }, ...it.todo.map((t) => h('li', null, t)))));
+  if (CX.diff.warnings.some((w) => it && w.startsWith(`${it.id}: touches`))) det.append(h('div', { class: 'cx-box warn' }, CX.diff.warnings.filter((w) => w.startsWith(`${it.id}: touches`)).join('\n')));
+
+  const each = (fn) => { for (const id of g.units) if (!cxUnit(id).errors.length) fn(id); cxChanged(); };
+  const next = () => { const list = CX.diff.groups; const i = list.findIndex((x) => x.id === g.id); const n = [...list.slice(i + 1), ...list.slice(0, i)].find((x) => cxStats(x).todo > 0); if (n) { CX.sel = n.id; renderCx(); det.scrollTop = 0; } };
+  det.append(h('div', { class: 'cx-actions' },
+    h('button', { class: 'btn small', type: 'button', onclick: () => each((id) => cxSetPick(id, true)) }, '전부 채택'),
+    h('button', { class: 'btn small', type: 'button', onclick: () => each((id) => cxSetPick(id, false)) }, '전부 제외'),
+    h('button', { class: 'btn small', type: 'button', onclick: () => each((id) => { delete CX.dec.units[id]; }) }, '결정 지우기'),
+    h('button', { class: 'btn small', type: 'button', onclick: next }, '다음 미결정 →')));
+
+  const rows = new Map();
+  for (const id of g.units) { const u = cxUnit(id); if (!rows.has(u.row)) rows.set(u.row, []); rows.get(u.row).push(u); }
+  for (const rowUnits of rows.values()) det.append(cxRowCard(rowUnits));
+  if (!g.units.length) det.append(h('p', { style: 'color:var(--text-muted)' }, '이 항목으로 바뀐 내용이 없습니다. 반영하면 반려 처리됩니다.'));
+
+  // Note: 누가·왜 요청했고 어시스턴트가 어떻게 판단했는지(내용이 있을 때만)
+  if (it) {
+    const st = cxStats(g);
+    const allOff = st.picked === 0;
+    const reason = h('textarea', { rows: 2, placeholder: '제보자에게 보이는 반려 사유', spellcheck: 'false' });
+    reason.value = CX.dec.items[it.id]?.reject_reason ?? it.reject_reason ?? '';
+    reason.addEventListener('change', () => { (CX.dec.items[it.id] ??= {}).reject_reason = reason.value.trim(); cxChanged(); });
+    const note = h('div', { class: 'cx-box' }, h('span', { class: 'lbl' }, 'Note'),
+      h('dl', { class: 'cx-note' },
+        h('dt', null, '출처'), h('dd', null, `${it.kind === 'submission' ? '장소 제보' : '수정 제안'} ${it.id} · ${new Date(it.created_at).toLocaleString('ko-KR')}`),
+        h('dt', null, '요청 내용'), h('dd', null, it.request),
+        it.why ? [h('dt', null, '요청 이유'), h('dd', null, it.why)] : null,
+        it.memo ? [h('dt', null, '어시스턴트 메모'), h('dd', null, it.memo)] : null,
+        it.candidates?.length ? [h('dt', null, '같은 지역 기존 장소'), h('dd', null, it.candidates.map((c) => `${c.name ?? '?'} (${c.id})`).join(', '))] : null,
+        h('dt', null, `처리 결과`), h('dd', null, allOff ? `반려 · 아래 사유가 제보자에게 보입니다` : `승인 (채택 ${st.picked}건)`)));
+    if (allOff) note.append(reason);
+    const imgs = h('div', { class: 'cx-imgs' });
+    if (it.images?.length) note.append(imgs);
+    det.append(note);
+    for (const im of it.images || []) {
+      const url = await cxImageUrl(im.local);
+      if (url) imgs.append(h('figure', null, h('img', { src: url, alt: im.role }), h('figcaption', null, im.role === 'screenshot' ? '인게임 스크린샷' : '장소 사진')));
+    }
+  }
+}
+
+/* ── 이벤트 ── */
+const cxErr = (e) => { if ($('cxErr')) $('cxErr').textContent = e.message || String(e); else cxSetSave(e.message || String(e), 'warn'); };
+$('cxOpen').onclick = async () => {
+  try {
+    const stored = !CX.dir ? await idbGet('cxdata') : null;
+    if (stored?.requestPermission && (await stored.requestPermission({ mode: 'readwrite' })) === 'granted') return await cxConnect(stored);
+    if (!window.showDirectoryPicker) throw new Error('Chrome이나 Edge에서 열어 주세요(폴더 열기 필요).');
+    await cxConnect(await window.showDirectoryPicker({ id: 'fps-data', mode: 'readwrite' }));
+  } catch (e) { if (e.name !== 'AbortError') cxErr(e); }
+};
+$('cxReload').onclick = async () => { if (!CX.dir) return; try { await cxLoad(); } catch (e) { cxErr(e); } };
+$('cxFilters').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b || !CX.diff) return; CX.filter = b.dataset.f; $('cxFilters').querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); renderCx(); });
+$('cxKinds').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b || !CX.diff) return; CX.kind = b.dataset.k; $('cxKinds').querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); renderCx(); });
+idbGet('cxdata').then((d) => { if (d?.requestPermission) $('cxOpen').textContent = `data 폴더 다시 연결 (${d.name})`; });
+</script>
+</body>
+</html>

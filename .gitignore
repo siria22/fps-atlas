@@ -28,8 +28,16 @@ Thumbs.db
 
 # 내부 작업 문서·데이터 도구(로컬에만 둠). 공개 저장소에는 배포에 필요한 것과 supabase/만 올린다.
 /CLAUDE.md
-/docs
-/scripts
+/data
+# 데이터 도구는 공개(2026-10-18): 데이터 작업 명령·검수기·흐름 문서만. 키는 .env에만 있어 스크립트에는 없다.
+/docs/*
+!/docs/data-workflow.md
+/scripts/*
+!/scripts/atlas.ts
+!/scripts/atlas/
+!/scripts/seed/
+/scripts/seed/*
+!/scripts/seed/seed-review.html
 /seed
 # 시드 데이터 백업(zip)
 /.backup

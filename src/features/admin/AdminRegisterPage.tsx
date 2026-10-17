@@ -298,7 +298,7 @@ export function AdminRegisterPage() {
               </div>
               <p className={styles.cardCaption}>고른 주·도에 이미 등록된 장소가 있으면 연결하고, 없으면 새 장소로 등록합니다.</p>
               <PlaceChoice candidates={candidates} mapId={existingMap?.id ?? null} value={place} onChange={setPlace} newHint="장소 이름을 정하고 위 지도에서 공개 핀을 찍습니다" />
-              <small className={styles.help}>기존 장소를 고르면 그 장소의 좌표를 그대로 씁니다. 같은 맵과 이미 연결돼 있으면 근거만 추가됩니다.</small>
+              <small className={styles.help}>기존 장소를 고르면 그 장소의 좌표를 그대로 씁니다. 같은 맵과 이미 연결돼 있으면 근거 출처를 더하고, 근거 수준은 기존 값과 고른 값 중 높은 쪽을 남깁니다.</small>
             </section>
           </div>
         </div>

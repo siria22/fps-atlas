@@ -46,6 +46,8 @@ export function AppLayout() {
   }, [menuOpen])
 
   const name = profile?.display_name ?? user?.user_metadata.name ?? ''
+  // 탈퇴 창은 공개 이미지 출처에 남는 이름을 보여 준다(실명이 아닌 닉네임)
+  const creditName = profile?.nickname ?? ''
   const login = () => { setAuthError(''); void loginWithGoogle(window.location.pathname).catch((e: Error) => setAuthError(e.message)) }
   const logout = () => { setAuthError(''); void signOut().catch((e: Error) => setAuthError(e.message)) }
   const navItems = (className?: string, activeClass?: string) => (
@@ -97,7 +99,7 @@ export function AppLayout() {
             </>
           )}
           {/* 해제 후 로그아웃돼도 완료 다이얼로그가 남도록 항상 그린다 */}
-          <DeleteAccountButton name={name} showButton={Boolean(user)} className={styles.footerUnlink} />
+          <DeleteAccountButton name={creditName} showButton={Boolean(user)} className={styles.footerUnlink} />
         </div>
         <span className={styles.footerRight}>{t('footer.borders')}</span>
       </footer>
@@ -128,7 +130,7 @@ export function AppLayout() {
           </div>
           <div className={styles.drawerSection}>
             <NavLink to="/guide" className={styles.drawerLink}>{t('footer.guide')}</NavLink>
-            <DeleteAccountButton name={name} showButton={Boolean(user)} className={styles.drawerUnlink} />
+            <DeleteAccountButton name={creditName} showButton={Boolean(user)} className={styles.drawerUnlink} />
           </div>
           <span className={styles.drawerFoot}>{t('footer.borders')}</span>
         </aside>

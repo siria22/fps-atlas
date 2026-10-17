@@ -2,7 +2,8 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from './supabase.ts'
 
-interface Profile { display_name: string; role: 'user' | 'admin'; avatar_url: string | null }
+/** display_name은 본인에게만 보이는 Google 이름, nickname은 공개 출처에 쓰는 이름 */
+interface Profile { display_name: string; nickname: string; role: 'user' | 'admin'; avatar_url: string | null }
 interface AuthState { user: User | null; profile: Profile | null; loading: boolean }
 const AuthContext = createContext<AuthState>({ user: null, profile: null, loading: true })
 
@@ -10,25 +11,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({ user: null, profile: null, loading: true })
   useEffect(() => {
     let active = true
-    const apply = (session: Session | null) => setState({ user: session?.user ?? null, profile: null, loading: Boolean(session?.user) })
+    // 탭을 다시 보거나 토큰을 갱신할 때도 같은 사용자로 SIGNED_IN·TOKEN_REFRESHED가 온다.
+    // 이때 loading으로 되돌리면 로그인 확인 화면이 작성 중인 양식을 내렸다가 새로 만들므로, 사용자가 바뀔 때만 프로필을 다시 읽는다.
+    const apply = (session: Session | null) => setState((current) => {
+      const user = session?.user ?? null
+      if (user && current.user?.id === user.id) return { ...current, user }
+      return { user, profile: null, loading: Boolean(user) }
+    })
     void supabase.auth.getSession().then(({ data }) => { if (active) apply(data.session) })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => { if (active) apply(session) })
     return () => { active = false; subscription.unsubscribe() }
   }, [])
+  const userId = state.user?.id
   useEffect(() => {
     let active = true
-    if (!state.user) return
+    if (!userId) return
     const loadProfile = async () => {
       try {
-        const { data } = await supabase.from('profiles').select('display_name, role, avatar_url').eq('id', state.user!.id).maybeSingle()
-        if (active) setState((current) => current.user?.id === state.user?.id ? { ...current, profile: data, loading: false } : current)
+        const { data } = await supabase.from('profiles').select('display_name, nickname, role, avatar_url').eq('id', userId).maybeSingle()
+        if (active) setState((current) => current.user?.id === userId ? { ...current, profile: data, loading: false } : current)
       } catch {
         if (active) setState((current) => ({ ...current, loading: false }))
       }
     }
     void loadProfile()
     return () => { active = false }
-  }, [state.user])
+  }, [userId])
   return <AuthContext.Provider value={state}>{children}</AuthContext.Provider>
 }
 

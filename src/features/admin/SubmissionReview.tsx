@@ -196,7 +196,7 @@ export function SubmissionReview({ submission: s }: { submission: AdminSubmissio
             onChange={setPlace}
             newHint="장소 이름을 정하고 아래 지도에서 공개 핀을 찍습니다"
           />
-          <span className={styles.help}>기존 장소를 고르면 그 장소의 좌표를 그대로 씁니다. 이 맵과 이미 연결돼 있으면 근거만 추가됩니다.</span>
+          <span className={styles.help}>기존 장소를 고르면 그 장소의 좌표를 그대로 씁니다. 이 맵과 이미 연결돼 있으면 근거 출처를 더하고, 근거 수준은 기존 값과 고른 값 중 높은 쪽을 남깁니다.</span>
 
           <span className={styles.sectionLabel}>공개 좌표 · 새 장소일 때 지도를 클릭해 핀을 실제 위치로 옮기세요</span>
           <LocationPicker

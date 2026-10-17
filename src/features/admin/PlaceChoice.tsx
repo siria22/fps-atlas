@@ -11,7 +11,7 @@ export type PlaceDecision = { kind: 'existing'; placeId: string } | { kind: 'new
  */
 export function PlaceChoice(props: {
   candidates: AdminPlace[]
-  /** 확정한 맵 id. 그 맵과 이미 연결된 장소는 "근거만 추가"로 표시한다. */
+  /** 확정한 맵 id. 그 맵과 이미 연결된 장소는 "근거 추가"로 표시한다. */
   mapId: string | null
   value: PlaceDecision
   onChange: (value: PlaceDecision) => void
@@ -31,7 +31,7 @@ export function PlaceChoice(props: {
               <b>{place.name}</b>
               <small>
                 기존 장소 · {locationLabel(place.country, place.region)} · 맵 {place.links.length}개 연결 · {place.lat.toFixed(2)}, {place.lng.toFixed(2)}
-                {linked && ' · 이 맵과 이미 연결됨(근거만 추가)'}
+                {linked && ' · 이 맵과 이미 연결됨(근거 추가)'}
               </small>
             </span>
           </label>

@@ -13,7 +13,8 @@
     "seed": "node scripts/seed-import.ts",
     "verify:rls": "node scripts/verify-rls.ts",
     "verify:cleanup": "node scripts/verify-cleanup.ts",
-    "geo:build": "node scripts/build-geo.ts"
+    "geo:build": "node scripts/build-geo.ts",
+    "atlas": "node scripts/atlas.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.3",

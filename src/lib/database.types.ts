@@ -137,16 +137,19 @@ export type Database = {
           alias: string
           created_at: string
           game_id: string
+          lang: string
         }
         Insert: {
           alias: string
           created_at?: string
           game_id: string
+          lang: string
         }
         Update: {
           alias?: string
           created_at?: string
           game_id?: string
+          lang?: string
         }
         Relationships: [
           {
@@ -231,16 +234,19 @@ export type Database = {
         Row: {
           alias: string
           created_at: string
+          lang: string
           map_id: string
         }
         Insert: {
           alias: string
           created_at?: string
+          lang: string
           map_id: string
         }
         Update: {
           alias?: string
           created_at?: string
+          lang?: string
           map_id?: string
         }
         Relationships: [
@@ -489,6 +495,7 @@ export type Database = {
           created_at: string
           display_name: string
           id: string
+          nickname: string
           role: Database["public"]["Enums"]["user_role"]
         }
         Insert: {
@@ -496,6 +503,7 @@ export type Database = {
           created_at?: string
           display_name: string
           id: string
+          nickname?: string
           role?: Database["public"]["Enums"]["user_role"]
         }
         Update: {
@@ -503,6 +511,7 @@ export type Database = {
           created_at?: string
           display_name?: string
           id?: string
+          nickname?: string
           role?: Database["public"]["Enums"]["user_role"]
         }
         Relationships: []
