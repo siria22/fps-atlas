@@ -8,7 +8,7 @@ import {
   EVIDENCE, FILES, SUBMISSION_PREFIX, TABLE_LABEL, TABLE_ORDER, checkRow, flatten, lit, readJson, readJsonIf, sha256, sql, writeJson,
   type AtlasFile, type FlatRow, type NamesFile, type Row, type Table,
 } from './lib.ts'
-import type { WorkItem, Worklist } from './inbox.ts'
+import { originalHash, readOriginals, type WorkItem, type Worklist } from './inbox.ts'
 
 export interface Unit {
   id: string
@@ -38,6 +38,11 @@ export interface DiffFile {
   hashes: { atlas: string; names: string; worklist: string | null }
   units: Unit[]
   groups: Group[]
+  /**
+   * 작업 목록 항목별 원문 확인: inbox 때 해시와, 작업 목록의 original이 고쳐졌는지(file), DB 원문이 그 사이 바뀌었는지(db).
+   * 둘 다 false면 검수기에 보이는 원문이 제보자가 보낸 그대로다.
+   */
+  originals: Record<string, { hash: string; file_changed: boolean; db_changed: boolean | null }>
   /** 둘 이상의 항목이 함께 가리키는 행(오류가 아니라 의도된 병합) */
   shared: { row: string; items: string[] }[]
   warnings: string[]
@@ -165,6 +170,18 @@ export async function diff() {
     const missing = it.touches.filter((t) => !changedKeys.includes(t))
     if (missing.length) warnings.push(`${it.id}: touches에 있지만 바뀌지 않은 행 ${missing.join(', ')}`)
   }
+  // 원문: 작업 목록의 original은 고치지 않는다. 고쳐졌거나 그 사이 DB 원문이 바뀌었으면 경고한다.
+  const originals: DiffFile['originals'] = {}
+  const dbOriginals = await readOriginals((worklist?.items ?? []).filter((it) => it.original).map((it) => it.id))
+  for (const it of worklist?.items ?? []) {
+    if (!it.original) { warnings.push(`${it.id}: 작업 목록에 원문(original)이 없음 · 예전 inbox로 만든 항목`); continue }
+    const db = dbOriginals.get(it.id)
+    const o = { hash: it.original_hash, file_changed: originalHash(it.original) !== it.original_hash, db_changed: db ? originalHash(db) !== it.original_hash : null }
+    originals[it.id] = o
+    if (o.file_changed) warnings.push(`${it.id}: 작업 목록의 원문(original)이 inbox 이후 고쳐짐 · 원문은 고치지 않습니다`)
+    if (o.db_changed) warnings.push(`${it.id}: DB의 원문이 inbox 이후 바뀜 · pull --force 후 inbox부터 다시`)
+    if (o.db_changed === null) warnings.push(`${it.id}: DB에서 원문을 찾지 못함`)
+  }
   const stray = units.filter((u) => !u.items.length).length
   if (worklist && stray) warnings.push(`제보 처리 중인데 작업 목록에 없는 변경 ${stray}건이 섞여 있음(touches 누락 또는 직접 수정) · 게임별 묶음에서 확인`)
   const byGame = new Map<string, string[]>()
@@ -176,7 +193,7 @@ export async function diff() {
   const out: DiffFile = {
     format: 'fps-atlas-diff/1', created_at: new Date().toISOString(),
     hashes: { atlas: sha256(FILES.atlas), names: sha256(FILES.names), worklist: worklist ? sha256(FILES.worklist) : null },
-    units, groups, warnings,
+    units, groups, warnings, originals,
     shared: [...itemOf].filter(([row, ids]) => ids.length > 1 && changedKeys.includes(row)).map(([row, items]) => ({ row, items })),
   }
   writeJson(FILES.diff, out)

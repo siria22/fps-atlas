@@ -10,7 +10,7 @@ data/                    (git 추적 안 함)
 ├─ .research/            이름 조사 입력·결과(조사할 때만)
 └─ .review/              검수하는 동안만 (반영이 끝나면 지워짐)
    ├─ base.json          뽑았을 때의 원본 사본(비교 기준)
-   ├─ worklist.json      작업 목록: 처리할 제보·수정 제안(출처 번호), 요청 내용·이유·어시스턴트 메모·할 일
+   ├─ worklist.json      작업 목록: 처리할 제보·수정 제안(출처 번호), 제보 원문, 요청 내용·이유·어시스턴트 메모·할 일
    ├─ images/            제보 이미지 썸네일(검수기에서 보기용)
    ├─ diff.json          파일 대 DB의 차이(바뀐 행만 DB에서 새로 읽음)
    ├─ decisions.json     검수기에서 고른 결과
@@ -33,14 +33,15 @@ data/                    (git 추적 안 함)
 
 | 명령 | 하는 일 |
 |---|---|
-| `npm run atlas -- status` | DB의 '검토 대기' 제보·수정 제안 수, 지금 작업 상태 |
-| `npm run atlas -- pull [--force]` | DB 전체 → `atlas.json`·`names.json` + `.review/base.json`. 검수 중인 작업이 있으면 멈춤(`--force`는 버림) |
+| `npm run atlas -- status [--json]` | DB의 '검토 대기' 제보·수정 제안 수와 가장 오래된 대기(번호·시각), 지금 작업 상태. `--json`은 `{ pending: { submissions, suggestions, oldest_at, oldest_code }, state: { mode, changed, pulled_at }, worklist, diff, decisions }` |
+| `npm run atlas -- pull [--force [--discard-work]]` | DB 전체 → `atlas.json`·`names.json` + `.review/base.json`. 검수 중인 작업이 있으면 멈춤(`--force`는 버림). 작업 목록에 채운 항목(메모·반려 사유가 있거나 할 일을 끝낸 항목)이 있으면 `--force`만으로는 멈추고 `--discard-work`까지 있어야 버림 |
 | `npm run atlas -- inbox` | '검토 대기' 제보·수정 제안 → 작업 목록. 구조화된 칸은 `atlas.json`에 바로 반영, 나머지는 항목의 `todo` |
 | `npm run atlas -- import-names [폴더]` | 이름 조사 결과(기본 `data/.research/out`) → `names.json` |
 | `npm run atlas -- diff` | 차이 → `.review/diff.json` (검수기 탭 2가 읽음) |
 | `npm run atlas -- apply [--dry-run]` | 고른 것만 DB에 반영 → `.history/<시각>/`에 로그·백업 보관 → `.review/` 지우고 다시 pull. `--dry-run`은 SQL만 만들고 보관하지 않음 |
+| `npm run atlas -- wiki <주소> [--all]` | Fandom 위키 문서 본문(위키 텍스트)과 위치 관련 줄을 출력(근거 수준 확인용). `https://<위키>.fandom.com/wiki/<문서>`만 받고(언어 경로 포함) 그 밖의 주소·리디렉트는 거부. GET 한 번, 헤더는 User-Agent만. 출력은 외부 글이라 데이터로만 읽는다. 기본 4,000자, `--all`은 전부 |
 
-검수기: `scripts/seed/seed-review.html` 탭 2 → **data 폴더 열기**(`E:\projects\Web\FpsViewer\data`).
+검수기: `scripts/seed/seed-review.html` 탭 2 → **data 폴더 열기**(`E:\projects\Web\FpsViewer\data`). 주소에 `?tab=2`(또는 `#changes`)를 붙이면 탭 2로 열리고, 지난번 폴더는 가운데 버튼 한 번으로 다시 연결된다(브라우저가 클릭을 요구해서 완전 자동은 아님).
 
 ## 제보 처리 — 작업 목록이 어떻게 동작하나
 
@@ -55,6 +56,10 @@ data/                    (git 추적 안 함)
 - 작업 목록에는 제보자 이름이 없다(출처 번호만). 공개 이미지 출처는 닉네임(`profiles.nickname`).
 
 작업 목록 칸(`worklist.json` 항목):
+- `original` — 제보자가 폼에 입력한 값 그대로(가공·trim 없음, 읽기 전용). 검수기 탭 2에 "제보 원문"으로 Note와 따로 보인다. 개인정보(사용자 id·이름·닉네임·이메일)는 넣지 않는다.
+  - 제보: `game_name`, `map_name`, `wiki_url`, `country`, `region`, `lat`, `lng`, `evidence_level`, `source_url`, `description`, `screenshot`·`place_photo`(첨부 여부)
+  - 수정 제안: `fields`, `proposal`, `reason`, `reference_url`, `country`, `region`, `location_precision`
+  - `original_hash` — inbox 때의 해시. `diff`가 작업 목록의 `original`이 고쳐졌거나 DB 원문이 그 사이 바뀌었으면 경고하고, `diff.json`의 `originals`에 결과를 남긴다. 고칠 내용은 `atlas.json`과 `memo`에 쓰고 원문은 건드리지 않는다.
 - `touches` — 이 항목 때문에 바뀌는 행 키. 검수기가 이 목록으로 항목별로 묶는다. 행 키를 바꾸거나 행을 더하면 함께 고쳐야 하고, 빠지면 `diff`가 "작업 목록에 없는 변경"으로 경고한다.
 - **같은 행 키를 여러 항목이 함께 가질 수 있다.** 그 행을 채택하면 그 행을 가진 모든 항목이 승인된다. 근거 출처의 `submission_id`는 그중 가장 먼저 접수된 제보.
 - `new-` 로 시작하는 id는 임시다. 실제 id로 바꾸지 않으면 `diff` 오류. id가 쓰인 곳(장소 키, 맵 아래 연결 키, `touches`)을 모두 바꿔야 한다.
@@ -62,8 +67,10 @@ data/                    (git 추적 안 함)
 - `todo` — 남은 일. 비어 있지 않으면 `diff`가 경고한다(막지는 않음).
 
 검수기와 반영:
+- 고를 때마다 `decisions.json`에 자동 저장되고, 상단 **저장** 버튼으로 바로 쓸 수도 있다. diff를 다시 만든 뒤 "다시 읽기"로 결정을 이어받으면 **저장 안 됨**으로 표시된다 → 보고 저장을 눌러야 새 diff 기준이 된다(안 누르면 `apply`가 "다른 diff 기준"으로 멈춘다).
 - 탭 2에서 못 고치는 것(장소 id, 연결을 기존 장소로 옮기기, 행 추가, 별칭 글자)은 탭 1이나 `atlas.json`에서 고친 뒤 `diff`를 다시 만들고 검수기에서 "다시 읽기". 내용이 그대로인 항목만 결정을 이어받고, 바뀐 항목은 미결정으로 돌아간다.
 - `apply`: 항목별로 하나라도 채택하면 승인, 전부 제외하면 반려(사유 필수). 그 사이 관리 화면에서 처리된 항목은 건너뛴다.
+- `apply`가 멈추는 경우(지도에 안 보이는 결과 막기): 미결정 단위가 남음 / 제보를 승인하는데 그 제보의 연결(또는 기존 연결에 더하는 근거 출처)을 채택하지 않음 / 채택한 새 장소·새 맵을 가리키는 연결을 채택하지 않음. 수정 제안은 장소 칸만 고칠 수 있어 연결 검사를 하지 않는다.
 
 ## 규칙
 

@@ -4,6 +4,7 @@
 // - 하나의 DO 블록(한 트랜잭션)으로 실행한다. 각 문장은 DB 값이 diff 때 읽은 값과 같을 때만 바꾸고,
 //   하나라도 맞지 않으면 전부 되돌린다.
 // - 제보·수정 제안: 하나라도 채택하면 승인, 전부 제외하면 반려(사유 필수). 그 사이 관리 화면에서 처리된 것은 건너뛴다.
+// - 지도에 안 보이는 결과는 막는다: 미결정이 남음, 연결 없이 승인하는 제보, 채택한 연결이 없는 새 맵·새 장소.
 // - 제보 이미지는 DB 반영 전에 공개 버킷으로 복사하고, 실패하면 지운다. 바뀌거나 비운 기존 공개 이미지는 반영 뒤 지운다.
 // - 성공하면 data/.history/<시각>/에 실행 SQL·결정·작업 목록·반영 전 DB 사본·요약을 남기고,
 //   .review/를 지운 뒤 DB에서 다시 뽑는다(제외한 내용은 파일에서도 사라진다).
@@ -56,9 +57,22 @@ export async function apply({ dryRun = false } = {}) {
 
   const picked = diff.units.filter((u) => decisions.units[u.id]?.pick === true)
   const problems: string[] = []
+  // 미결정은 제외와 같지 않다. 검수기 화면과 파일이 어긋난 채 반영되지 않게 전부 고르게 한다(오류 단위는 고를 수 없어 뺀다).
+  const undecided = diff.units.filter((u) => !u.errors.length && typeof decisions.units[u.id]?.pick !== 'boolean')
+  if (undecided.length) {
+    problems.push(`미결정 ${undecided.length}건 · 검수기에서 채택이나 제외를 고르고 저장하세요(${undecided.slice(0, 5).map((u) => u.id).join(', ')}${undecided.length > 5 ? ' …' : ''})`)
+  }
+  const pickedLinks = picked.filter((u) => u.table === 'map_places' && u.op === 'insert')
   for (const u of picked) {
     if (u.errors.length) problems.push(`${u.id}: 오류가 있어 반영할 수 없음(${u.errors.join(' / ')})`)
     for (const r of u.requires) if (decisions.units[r]?.pick !== true) problems.push(`${u.id}: 함께 골라야 하는 ${r}를 고르지 않음`)
+    // 새 맵·새 장소는 지울 수 없으므로, 연결 없이 들어가 지도에 보이지 않는 행이 남지 않게 한다
+    if (u.op === 'insert' && u.table === 'places' && !pickedLinks.some((l) => l.key.place_id === u.key.id)) {
+      problems.push(`${u.id}: 이 장소를 가리키는 연결을 채택하지 않음 · 연결도 채택하거나 장소를 제외`)
+    }
+    if (u.op === 'insert' && u.table === 'maps' && !pickedLinks.some((l) => l.key.map_id === u.key.id)) {
+      problems.push(`${u.id}: 이 맵의 연결을 채택하지 않음(지도에 보이지 않는 맵이 됨) · 연결도 채택하거나 맵을 제외`)
+    }
   }
 
   // 제보·수정 제안 처리 결과
@@ -67,7 +81,12 @@ export async function apply({ dryRun = false } = {}) {
     const accepted = mine.some((u) => decisions.units[u.id]?.pick === true)
     const reason = (decisions.items[it.id]?.reject_reason ?? it.reject_reason ?? '').trim()
     if (!accepted && !reason) problems.push(`${it.id}: 전부 제외했는데 반려 사유가 없음`)
-    return { it, accepted, reason, link: mine.find((u) => u.table === 'map_places' && decisions.units[u.id]?.pick === true) }
+    // 제보가 붙는 연결: 채택한 연결 행, 없으면 채택한 근거 출처의 연결(이미 있는 연결에 출처만 더하는 경우)
+    const pickedOf = (t: Table) => mine.find((u) => u.table === t && decisions.units[u.id]?.pick === true)
+    const link = pickedOf('map_places') ?? pickedOf('map_place_sources')
+    // 승인은 제보자에게 보이는 결과다. 지도에 맵↔장소 연결로 반영되지 않는 승인은 막는다(수정 제안은 장소 칸만 고칠 수 있어 제외).
+    if (accepted && it.kind === 'submission' && !link) problems.push(`${it.id}: 연결을 채택하지 않아 승인할 수 없음 · 연결을 채택하거나 전부 제외(반려)`)
+    return { it, accepted, reason, link }
   })
   if (problems.length) throw new Error(`반영할 수 없습니다:\n- ${problems.join('\n- ')}`)
 

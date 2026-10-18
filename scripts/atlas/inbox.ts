@@ -2,10 +2,11 @@
 // 구조화된 칸(맵·국가·주·도·좌표·근거 수준·근거 URL·이미지)은 data/atlas.json에 바로 반영한다.
 // 문장으로 된 부분(새 장소 이름, 기존 장소와 같은지, 시대, 수정 제안의 "어떻게")은 각 항목의 todo로 남긴다
 // → 어시스턴트가 채운다. 이미 작업 목록에 있는 항목은 건너뛴다.
+import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
-  FILES, SUBMISSION_PREFIX, adminClient, admin1, country, readJson, readJsonIf, sql, workState, writeJson,
+  FILES, SUBMISSION_PREFIX, adminClient, admin1, country, lit, readJson, readJsonIf, sql, workState, writeJson,
   type AtlasFile, type Image, type NamesFile,
 } from './lib.ts'
 
@@ -29,13 +30,26 @@ export interface WorkItem {
   candidates?: { id: string; name: string | null; region: string | null }[]
   /** 검수기에서 볼 제보 이미지(받아 둔 썸네일, data/ 기준 경로) */
   images: { role: 'screenshot' | 'place_photo'; local: string }[]
+  /** 제보자가 폼에 입력한 값 그대로(읽기 전용 · 어시스턴트가 고치지 않는다). 개인정보는 넣지 않는다. */
+  original: SubmissionOriginal | SuggestionOriginal
+  /** inbox 때 original의 해시. diff가 지금 값(파일·DB)과 비교해 다르면 경고한다. */
+  original_hash: string
+}
+export interface SubmissionOriginal {
+  game_name: string; map_name: string; wiki_url: string | null; country: string; region: string | null
+  lat: number | null; lng: number | null; evidence_level: string; source_url: string | null; description: string | null
+  screenshot: boolean; place_photo: boolean
+}
+export interface SuggestionOriginal {
+  fields: string[]; proposal: string; reason: string; reference_url: string | null
+  country: string | null; region: string | null; location_precision: string | null
 }
 export interface Worklist { format: 'fps-atlas-worklist/1'; created_at: string; items: WorkItem[] }
 
 const slug = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
 
 interface SubmissionRow {
-  id: number; code: string; created_at: string; nickname: string | null
+  id: number; code: string; created_at: string
   game_id: string | null; game_name: string; map_id: string | null; map_name: string; wiki_url: string | null
   country: string; country_code: string; region: string | null; admin1_code: string | null; lat: number | null; lng: number | null
   evidence_level: string; source_url: string | null; description: string | null
@@ -47,6 +61,35 @@ interface SuggestionRow {
   country: string | null; country_code: string | null; region: string | null; admin1_code: string | null; location_precision: string | null
 }
 
+// 원문: DB 행의 사용자 입력 칸을 가공 없이(trim도 하지 않음). 칸 순서가 해시에 들어가므로 여기서만 만든다.
+const submissionOriginal = (s: SubmissionRow): SubmissionOriginal => ({
+  game_name: s.game_name, map_name: s.map_name, wiki_url: s.wiki_url, country: s.country, region: s.region,
+  lat: s.lat, lng: s.lng, evidence_level: s.evidence_level, source_url: s.source_url, description: s.description,
+  screenshot: !!s.screenshot_path, place_photo: !!s.place_photo_path,
+})
+const suggestionOriginal = (e: SuggestionRow): SuggestionOriginal => ({
+  fields: e.fields, proposal: e.proposal, reason: e.reason, reference_url: e.reference_url,
+  country: e.country, region: e.region, location_precision: e.location_precision,
+})
+export const originalHash = (o: WorkItem['original']) => createHash('sha256').update(JSON.stringify(o)).digest('hex')
+
+const SUBMISSION_SELECT = `s.id, s.code, s.created_at, s.game_id, s.game_name, s.map_id, s.map_name, s.wiki_url,
+  s.country, s.country_code, s.region, s.admin1_code, s.lat, s.lng, s.evidence_level, s.source_url, s.description,
+  s.screenshot_path, s.screenshot_thumb_path, s.place_photo_path, s.place_photo_thumb_path`
+const SUGGESTION_SELECT = `e.id, e.code, e.created_at, mp.map_id, mp.place_id, e.fields, e.proposal, e.reason, e.reference_url,
+  e.country, e.country_code, e.region, e.admin1_code, e.location_precision`
+
+/** 작업 목록 항목들의 지금 DB 원문(diff가 inbox 때와 비교한다). 행이 없으면 빠진다. */
+export async function readOriginals(codes: string[]): Promise<Map<string, WorkItem['original']>> {
+  const out = new Map<string, WorkItem['original']>()
+  if (!codes.length) return out
+  const list = codes.map(lit).join(', ')
+  for (const s of await sql<SubmissionRow>(`select ${SUBMISSION_SELECT} from public.submissions s where s.code in (${list})`)) out.set(s.code, submissionOriginal(s))
+  for (const e of await sql<SuggestionRow>(`select ${SUGGESTION_SELECT} from public.edit_suggestions e
+    join public.map_places mp on mp.id = e.map_place_id where e.code in (${list})`)) out.set(e.code, suggestionOriginal(e))
+  return out
+}
+
 export async function inbox() {
   if (!existsSync(FILES.base)) throw new Error('먼저 pull로 데이터를 뽑으세요.')
   const state = workState()
@@ -56,15 +99,12 @@ export async function inbox() {
   const list: Worklist = readJsonIf<Worklist>(FILES.worklist) ?? { format: 'fps-atlas-worklist/1', created_at: new Date().toISOString(), items: [] }
   const known = new Set(list.items.map((i) => i.id))
 
-  const subs = await sql<SubmissionRow>(`
-    select s.id, s.code, s.created_at, p.nickname, s.game_id, s.game_name, s.map_id, s.map_name, s.wiki_url,
-           s.country, s.country_code, s.region, s.admin1_code, s.lat, s.lng, s.evidence_level, s.source_url, s.description,
-           s.screenshot_path, s.screenshot_thumb_path, s.place_photo_path, s.place_photo_thumb_path
+  const subs = await sql<SubmissionRow & { nickname: string | null }>(`
+    select ${SUBMISSION_SELECT}, p.nickname
     from public.submissions s left join public.profiles p on p.id = s.user_id
     where s.status = '검토 대기' order by s.id`)
   const sugs = await sql<SuggestionRow>(`
-    select e.id, e.code, e.created_at, mp.map_id, mp.place_id, e.fields, e.proposal, e.reason, e.reference_url,
-           e.country, e.country_code, e.region, e.admin1_code, e.location_precision
+    select ${SUGGESTION_SELECT}
     from public.edit_suggestions e join public.map_places mp on mp.id = e.map_place_id
     where e.status = '검토 대기' order by e.id`)
 
@@ -149,6 +189,7 @@ export async function inbox() {
       request: `장소 제보 · ${s.game_name} / ${s.map_name} → ${[loc.country, loc.region].filter(Boolean).join(' > ')} · 근거 ${s.evidence_level}${s.source_url ? ` (${s.source_url})` : ''}`,
       why: s.description?.trim() || null, memo: null, touches, todo, reject_reason: null, candidates,
       images: [...await thumb(s.code, 'screenshot', s.screenshot_thumb_path), ...await thumb(s.code, 'place_photo', s.place_photo_thumb_path)],
+      original: submissionOriginal(s), original_hash: originalHash(submissionOriginal(s)),
     })
     added++
   }
@@ -177,6 +218,7 @@ export async function inbox() {
       id: e.code, kind: 'suggestion', created_at: e.created_at,
       request: `수정 제안 · ${e.map_id} ↔ ${e.place_id} · 고칠 항목 ${e.fields.join(', ')}\n어떻게: ${e.proposal}${e.reference_url ? `\n참고 URL: ${e.reference_url}` : ''}`,
       why: e.reason, memo: null, touches, todo, reject_reason: null, images: [],
+      original: suggestionOriginal(e), original_hash: originalHash(suggestionOriginal(e)),
     })
     added++
   }

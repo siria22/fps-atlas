@@ -248,6 +248,7 @@ a { color: var(--accent); }
 .cx-detail h2 { margin: 0; font-size: 19px; text-wrap: balance; }
 .cx-empty { margin: auto; max-width: 640px; display: flex; flex-direction: column; gap: 10px; color: var(--text-subtle); }
 .cx-empty strong { color: var(--text); font-size: 15px; }
+.cx-empty .cx-big { align-self: flex-start; padding: 10px 20px; font-size: 14px; }
 .cx-empty ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
 .cx-empty code, .cx-box code { font-family: var(--mono); font-size: 12px; color: var(--accent); }
 .cx-empty .err, .cx-warn { color: #ff8a8a; font-size: 12px; }
@@ -288,6 +289,9 @@ a { color: var(--accent); }
 .cx-note dt { color: var(--text-muted); }
 .cx-note dd { margin: 0; color: var(--text-2); white-space: pre-wrap; overflow-wrap: anywhere; }
 .cx-box textarea { width: 100%; padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--input); resize: vertical; }
+.cx-box.original { border-style: dashed; background: none; }
+.cx-box.original .cx-note dd { font-family: var(--mono); color: var(--text); }
+.cx-box.original .cx-note dd.empty { color: var(--text-muted); font-style: italic; font-family: var(--font); }
 .cx-imgs { display: flex; gap: 10px; flex-wrap: wrap; }
 .cx-imgs figure { margin: 0; display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--text-muted); }
 .cx-imgs img { max-width: 240px; max-height: 160px; border-radius: 4px; border: 1px solid var(--border); }
@@ -330,6 +334,7 @@ a { color: var(--accent); }
     <span class="spacer"></span>
     <span class="save-state" id="cxSave"></span>
     <button class="btn" id="cxOpen" type="button">data 폴더 열기</button>
+    <button class="btn" id="cxSaveNow" type="button" title="지금 결정을 decisions.json에 바로 씁니다(고를 때마다 자동 저장됨)">저장</button>
     <button class="btn" id="cxReload" type="button" title="diff를 다시 만든 뒤 누르세요">다시 읽기</button>
   </span>
 </header>
@@ -420,6 +425,7 @@ a { color: var(--accent); }
   <section class="cx-detail" id="cxDetail">
     <div class="cx-empty">
       <strong>data 폴더를 여세요</strong>
+      <button class="btn primary cx-big" type="button" data-cx-connect>data 폴더 연결</button>
       <ol>
         <li><code>npm run atlas -- pull</code>로 DB를 <code>data/atlas.json</code>·<code>names.json</code>으로 뽑습니다.</li>
         <li>제보·수정 제안은 <code>npm run atlas -- inbox</code>, 그 밖의 수정은 두 파일을 직접 고칩니다.</li>
@@ -1048,7 +1054,13 @@ function showPage(n) {
   try { localStorage.setItem('seed-review:page', n); } catch {}
 }
 document.querySelectorAll('.page-tabs button').forEach((b) => b.addEventListener('click', () => showPage(b.dataset.page)));
-try { if (localStorage.getItem('seed-review:page') === '2') showPage('2'); } catch {}
+// ?tab=2 또는 #changes로 열면 탭 2(어시스턴트가 띄우는 주소). 아니면 지난번 탭.
+{
+  const wanted = new URLSearchParams(location.search).get('tab') === '2' || location.hash === '#changes';
+  let last = null;
+  try { last = localStorage.getItem('seed-review:page'); } catch {}
+  if (wanted || last === '2') showPage('2');
+}
 </script>
 
 <script>
@@ -1083,7 +1095,8 @@ function cxStats(g) {
   }
   return { picked, off, todo, errors };
 }
-const cxWarn = (g) => g.units.some((id) => { const u = cxUnit(id); return u.flags.length || u.conflict; }) || (g.item?.todo?.length > 0);
+const cxWarn = (g) => g.units.some((id) => { const u = cxUnit(id); return u.flags.length || u.conflict; }) || (g.item?.todo?.length > 0)
+  || !!(g.item && (CX.diff.originals?.[g.item.id]?.file_changed || CX.diff.originals?.[g.item.id]?.db_changed));
 
 /* ── 고르기(의존 관계 유지) ── */
 function cxSetPick(id, v) {
@@ -1145,7 +1158,7 @@ async function cxLoad() {
         if (u && !u.errors.length && d.sig === cxSig(u)) { CX.dec.units[id] = d; kept++; } else reset++;
       }
       CX.dec.items = saved.items || {};
-      note = `diff를 새로 만들어 결정 ${kept}건을 이어받고, 내용이 바뀌었거나 없어진 ${reset}건은 미결정으로 되돌렸습니다.`;
+      note = `저장 안 됨 — 저장을 눌러야 반영할 수 있음 · 결정 ${kept}건을 이어받고, 내용이 바뀌었거나 없어진 ${reset}건은 미결정으로 되돌렸습니다.`;
     }
   }
   const n = diff.units.length;
@@ -1160,14 +1173,20 @@ function cxChanged() {
   renderCx();
   cxSetSave('저장 중…');
   clearTimeout(CX.timer);
-  CX.timer = setTimeout(async () => {
-    try {
-      const dir = await CX.dir.getDirectoryHandle('.review');
-      const w = await (await dir.getFileHandle('decisions.json', { create: true })).createWritable();
-      await w.write(JSON.stringify(CX.dec, null, 2) + '\n'); await w.close();
-      cxSetSave(`저장됨 ${new Date().toLocaleTimeString('ko-KR')}`, 'ok');
-    } catch (e) { cxSetSave(`저장 실패: ${e.message}`, 'warn'); }
-  }, 300);
+  CX.timer = setTimeout(() => void cxWrite(), 300);
+}
+/**
+ * 지금 결정을 .review/decisions.json에 쓴다(고를 때 자동 저장 · 저장 버튼).
+ * diff를 새로 만들어 결정을 이어받은 직후에는 쓰지 않는다 → 사람이 보고 저장을 눌러야 새 diff 기준이 된다.
+ */
+async function cxWrite(doneText) {
+  clearTimeout(CX.timer);
+  try {
+    const dir = await CX.dir.getDirectoryHandle('.review');
+    const w = await (await dir.getFileHandle('decisions.json', { create: true })).createWritable();
+    await w.write(JSON.stringify(CX.dec, null, 2) + '\n'); await w.close();
+    cxSetSave(doneText || `저장됨 ${new Date().toLocaleTimeString('ko-KR')}`, 'ok');
+  } catch (e) { cxSetSave(`저장 실패: ${e.message}`, 'warn'); }
 }
 
 /* ── 목록 ── */
@@ -1186,7 +1205,7 @@ function cxVisible() {
 }
 function renderCx() {
   const list = $('cxList'); list.replaceChildren();
-  if (!CX.diff) { $('cxSummary').textContent = ''; $('cxBadge').hidden = true; $('cxDetail').innerHTML = CX_EMPTY; return; }
+  if (!CX.diff) { $('cxSummary').textContent = ''; $('cxBadge').hidden = true; $('cxDetail').innerHTML = CX_EMPTY; if (CX.lastName && !CX.dir) cxConnectLabel(CX.lastName); else for (const b of document.querySelectorAll('[data-cx-connect]')) b.hidden = !!CX.dir; return; }
   for (const g of cxVisible()) {
     const st = cxStats(g);
     list.append(h('button', { class: 'row', type: 'button', role: 'option', 'aria-current': String(CX.sel === g.id), onclick: () => { CX.sel = g.id; renderCx(); $('cxDetail').scrollTop = 0; } },
@@ -1311,6 +1330,9 @@ async function renderCxDetail() {
   for (const rowUnits of rows.values()) det.append(cxRowCard(rowUnits));
   if (!g.units.length) det.append(h('p', { style: 'color:var(--text-muted)' }, '이 항목으로 바뀐 내용이 없습니다. 반영하면 반려 처리됩니다.'));
 
+  // 제보 원문: 제보자가 폼에 입력한 값 그대로(읽기 전용). 어시스턴트 메모(Note)와 따로 둔다.
+  if (it?.original) det.append(cxOriginalBox(it));
+
   // Note: 누가·왜 요청했고 어시스턴트가 어떻게 판단했는지(내용이 있을 때만)
   if (it) {
     const st = cxStats(g);
@@ -1337,6 +1359,26 @@ async function renderCxDetail() {
   }
 }
 
+const CX_ORIGINAL_LABEL = {
+  game_name: '게임 이름', map_name: '맵 이름', wiki_url: '팬덤 위키 URL', country: '국가', region: '주·도', lat: '위도', lng: '경도',
+  evidence_level: '근거 수준', source_url: '근거 URL', description: '추가 설명', screenshot: '인게임 스크린샷', place_photo: '장소 사진',
+  fields: '고칠 항목', proposal: '어떻게', reason: '왜', reference_url: '참고 URL', location_precision: '위치 범위',
+};
+function cxOriginalBox(it) {
+  const check = CX.diff.originals?.[it.id];
+  const show = (v) => (v == null || v === '' ? null : typeof v === 'boolean' ? (v ? '첨부함' : '없음') : Array.isArray(v) ? v.join(', ') : String(v));
+  const rows = Object.entries(it.original).flatMap(([k, v]) => {
+    const text = show(v);
+    return [h('dt', null, CX_ORIGINAL_LABEL[k] ?? k), h('dd', text == null ? { class: 'empty' } : null, text ?? '(비움)')];
+  });
+  const warn = check?.file_changed ? '작업 목록의 원문이 inbox 이후 고쳐졌습니다. 아래 값은 제보자가 보낸 것과 다를 수 있습니다.'
+    : check?.db_changed ? 'DB의 원문이 inbox 이후 바뀌었습니다. pull --force 후 inbox부터 다시 하세요.' : null;
+  return h('div', { class: `cx-box original${warn ? ' warn' : ''}` },
+    h('span', { class: 'lbl' }, `${it.kind === 'submission' ? '제보 원문' : '수정 제안 원문'} · 제보자가 입력한 그대로 (읽기 전용)`),
+    warn ? h('div', null, warn) : null,
+    h('dl', { class: 'cx-note' }, ...rows));
+}
+
 /* ── 이벤트 ── */
 const cxErr = (e) => { if ($('cxErr')) $('cxErr').textContent = e.message || String(e); else cxSetSave(e.message || String(e), 'warn'); };
 $('cxOpen').onclick = async () => {
@@ -1347,10 +1389,14 @@ $('cxOpen').onclick = async () => {
     await cxConnect(await window.showDirectoryPicker({ id: 'fps-data', mode: 'readwrite' }));
   } catch (e) { if (e.name !== 'AbortError') cxErr(e); }
 };
+$('cxSaveNow').onclick = () => { if (CX.dir && CX.dec) void cxWrite(); };
 $('cxReload').onclick = async () => { if (!CX.dir) return; try { await cxLoad(); } catch (e) { cxErr(e); } };
 $('cxFilters').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b || !CX.diff) return; CX.filter = b.dataset.f; $('cxFilters').querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); renderCx(); });
 $('cxKinds').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b || !CX.diff) return; CX.kind = b.dataset.k; $('cxKinds').querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); renderCx(); });
-idbGet('cxdata').then((d) => { if (d?.requestPermission) $('cxOpen').textContent = `data 폴더 다시 연결 (${d.name})`; });
+// 가운데 큰 버튼(빈 화면이 다시 그려져도 동작하게 위임). 브라우저가 권한을 다시 줄 때 클릭을 요구해서 완전 자동은 안 된다.
+$('cxDetail').addEventListener('click', (e) => { if (e.target.closest('[data-cx-connect]')) $('cxOpen').onclick(); });
+const cxConnectLabel = (name) => { for (const b of document.querySelectorAll('[data-cx-connect]')) b.textContent = `data 폴더 다시 연결 (${name})`; };
+idbGet('cxdata').then((d) => { if (d?.requestPermission) { $('cxOpen').textContent = `data 폴더 다시 연결 (${d.name})`; cxConnectLabel(d.name); CX.lastName = d.name; } });
 </script>
 </body>
 </html>

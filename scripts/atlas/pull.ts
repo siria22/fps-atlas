@@ -1,6 +1,8 @@
 // DB 전체를 data/atlas.json, data/names.json으로 뽑고, 비교 기준 사본을 data/.review/base.json에 둔다.
 // 검수 중인 작업(작업 목록·차이·결정)이 있으면 덮어쓰지 않고 멈춘다(--force로 버림).
+// 작업 목록에 어시스턴트가 채운 항목이 있으면 --force만으로는 멈추고 --discard-work까지 있어야 버린다.
 import { appendFileSync, existsSync, mkdirSync, rmSync } from 'node:fs'
+import type { Worklist } from './inbox.ts'
 import { join } from 'node:path'
 import {
   FILES, HISTORY, MODE_LABEL, REVIEW, readJsonIf, sql, workState, writeJson,
@@ -37,17 +39,24 @@ select json_build_object(
   'map_aliases', (select coalesce(json_agg(a order by a.map_id, a.alias), '[]') from (select map_id, alias, lang from public.map_aliases) a)
 ) as dump`
 
-export async function pull({ force = false, afterApply = false } = {}) {
+export async function pull({ force = false, discardWork = false, afterApply = false } = {}) {
   // 고친 내용이 남아 있으면 덮어쓰지 않는다(직접 수정·제보 처리 모두). --force는 버린다.
   const state = workState()
   if (state.mode === 'manual' || state.mode === 'inbox') {
     if (!force) throw new Error(`${MODE_LABEL[state.mode]}입니다(바뀐 행 ${state.changed}개). 반영(apply)하거나, 버리려면 pull --force.`)
     if (!afterApply) {
-      console.log(`고친 내용 ${state.changed}행${state.mode === 'inbox' ? '과 작업 목록' : ''}을 버립니다.`)
+      const items = readJsonIf<Worklist>(FILES.worklist)?.items ?? []
+      // 채운 항목 = 판단의 결과(메모·반려 사유가 있거나 할 일을 끝냄). 다시 만들려면 다시 판단해야 한다.
+      const filled = items.filter((i) => i.memo || i.reject_reason || !i.todo.length)
+      if (filled.length && !discardWork) {
+        throw new Error(`작업 목록 ${items.length}건 중 ${filled.length}건이 채워져 있습니다(${filled.map((i) => i.id).join(', ')}). `
+          + `그래도 버리려면 pull --force --discard-work.`)
+      }
+      console.log(`고친 내용 ${state.changed}행${state.mode === 'inbox' ? `과 작업 목록(채운 항목 ${filled.length}건)` : ''}을 버립니다.`)
       // 무엇을 버렸는지 한 줄 남긴다
-      const ids = readJsonIf<{ items: { id: string }[] }>(FILES.worklist)?.items.map((i) => i.id) ?? []
       mkdirSync(HISTORY, { recursive: true })
-      appendFileSync(join(HISTORY, 'discarded.log'), `${new Date().toISOString()}\t${MODE_LABEL[state.mode]}\t버린 행 ${state.changed}\t작업 목록 ${ids.join(',') || '-'}\n`)
+      appendFileSync(join(HISTORY, 'discarded.log'),
+        `${new Date().toISOString()}\t${MODE_LABEL[state.mode]}\t버린 행 ${state.changed}\t작업 목록 ${items.map((i) => i.id).join(',') || '-'}\t채운 항목 ${filled.length}\n`)
     }
   }
   if (existsSync(FILES.decisions) && !force) throw new Error('검수 결정(decisions.json)이 남아 있습니다. 반영하거나 pull --force.')
