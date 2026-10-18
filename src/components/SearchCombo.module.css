@@ -1,0 +1,18 @@
+/* 검색 입력 아래 드롭다운(Figma 게임 드롭다운) */
+.wrap {
+  position: relative;
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + var(--space-4));
+  left: 0;
+  right: 0;
+  z-index: 20;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.active {
+  background: var(--surface-selected);
+}

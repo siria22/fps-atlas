@@ -3,7 +3,9 @@ import { useQuery } from '@tanstack/react-query'
 import { geoArea, geoContains, geoMercator, geoPath, type GeoPermissibleObjects } from 'd3-geo'
 import { zoom as d3zoom, zoomIdentity, type ZoomBehavior, type ZoomTransform } from 'd3-zoom'
 import { select } from 'd3-selection'
-import { ChevronDown, Info, MapPin, Minus, Plus, Search, Undo2 } from 'lucide-react'
+import { Info, MapPin, Minus, Plus, Undo2 } from 'lucide-react'
+import { SearchCombo } from '../../components/SearchCombo.tsx'
+import { useI18n } from '../../i18n/i18n.tsx'
 import styles from './LocationPicker.module.css'
 
 /** public/geo/countries.json (scripts/build-geo.ts) */
@@ -104,31 +106,46 @@ export function LocationPicker(props: {
   const readOnly = pin?.readOnly ?? false
   const country = countries.data?.find((c) => c.code === value.countryCode) ?? null
   const regionFeature = regions.find((r) => r.properties.code === value.admin1Code) ?? null
+  const { lang, t } = useI18n()
+  // 화면 언어 이름과 다른 언어 이름(검색용)
+  const shown = (x: { name: string; nameEn: string }) => (lang === 'en' ? x.nameEn || x.name : x.name)
+  const other = (x: { name: string; nameEn: string }) => (lang === 'en' ? x.name : x.nameEn)
+  // 입력 중인 글자. 칸을 벗어나거나 목록에서 고르면 비우고, 고른 곳을 화면 언어 이름으로 보여 준다.
+  const [countryDraft, setCountryDraft] = useState<string | null>(null)
+  const [regionDraft, setRegionDraft] = useState<string | null>(null)
+  const countryText = countryDraft ?? (country ? shown(country) : value.country)
+  const regionText = regionDraft ?? (regionFeature ? shown(regionFeature.properties) : value.region)
 
+  // 저장값은 목록과 맞으면 표준(한국어) 이름, 아니면 친 글자 그대로
   const setCountry = (text: string) => {
     const match = findCountry(countries.data, text)
     const code = match?.code ?? null
+    const name = match?.name ?? text
     // 나라가 바뀌면 주·도는 비운다. 관리자 핀은 그 나라 수도로 옮긴다.
     if (code !== value.countryCode) {
-      onChange({ countryCode: code, country: text, admin1Code: null, region: '' })
+      onChange({ countryCode: code, country: name, admin1Code: null, region: '' })
+      setRegionDraft(null)
       pin?.onChange(defaultCoords(match, null))
-    } else onChange({ ...value, country: text })
+    } else onChange({ ...value, country: name })
   }
   const setRegionText = (text: string) => {
     const q = text.trim().toLocaleLowerCase()
     const match = regions.find((r) => r.properties.name.toLocaleLowerCase() === q || r.properties.nameEn.toLocaleLowerCase() === q) ?? null
-    onChange({ ...value, region: text, admin1Code: match?.properties.code ?? null })
+    onChange({ ...value, region: match?.properties.name ?? text, admin1Code: match?.properties.code ?? null })
     if ((match?.properties.code ?? null) !== value.admin1Code) pin?.onChange(defaultCoords(country, match))
   }
   const pickRegion = (feature: Admin1Feature, at?: Coords) => {
+    setRegionDraft(null)
     onChange({ ...value, region: feature.properties.name, admin1Code: feature.properties.code })
     pin?.onChange(at ?? defaultCoords(country, feature))
   }
 
-  const summary = value.countryCode
-    ? value.admin1Code
-      ? `${country?.name} > ${value.region}`
-      : `${country?.name} (국가 단위)`
+  const summary = country
+    ? regionFeature
+      ? `${shown(country)} > ${shown(regionFeature.properties)}`
+      : value.admin1Code
+        ? `${shown(country)} > ${value.region}`
+        : t('loc.countryLevel', { country: shown(country) })
     : null
 
   return (
@@ -136,8 +153,8 @@ export function LocationPicker(props: {
       {!props.embedded && (
         <div className={styles.title}>
           <div>
-            <h2>{props.title ?? '위치 선택'}</h2>
-            <p className={styles.caption}>{props.caption ?? '국가와 주·도를 선택해주세요.'}</p>
+            <h2>{props.title ?? t('loc.title')}</h2>
+            <p className={styles.caption}>{props.caption ?? t('loc.caption')}</p>
           </div>
           <MapPin size={18} strokeWidth={2} absoluteStrokeWidth className={styles.titleIcon} />
         </div>
@@ -145,27 +162,35 @@ export function LocationPicker(props: {
 
       <div className={styles.row}>
         <label className={styles.field}>
-          <span className={styles.label}>국가 *</span>
-          <Combo list="geo-countries" value={value.country} onChange={setCountry} placeholder="국가 검색" disabled={readOnly} />
-          <datalist id="geo-countries">
-            {countries.data?.map((c) => <option key={c.code} value={c.name} />)}
-          </datalist>
+          <span className={styles.label}>{t('loc.country')}</span>
+          <SearchCombo
+            id="geo-country"
+            value={countryText}
+            onChange={(text) => { setCountryDraft(text); setCountry(text) }}
+            onPick={(o) => { setCountryDraft(null); setCountry(countries.data?.find((c) => c.code === o.id)?.name ?? o.label) }}
+            onBlur={() => setCountryDraft(null)}
+            options={(countries.data ?? []).map((c) => ({ id: c.code, label: shown(c), terms: [other(c)] }))}
+            placeholder={t('loc.countryPlaceholder')}
+            disabled={readOnly}
+            classNames={{ combo: styles.combo, input: styles.input }}
+          />
         </label>
         <label className={styles.field}>
-          <span className={styles.label}>주·도 (선택)</span>
-          <Combo
-            list="geo-admin1"
-            value={value.region}
-            onChange={setRegionText}
-            placeholder={value.countryCode ? '주·도 검색' : '국가를 먼저 고르세요'}
+          <span className={styles.label}>{t('loc.region')}</span>
+          <SearchCombo
+            id="geo-admin1"
+            value={regionText}
+            onChange={(text) => { setRegionDraft(text); setRegionText(text) }}
+            onPick={(o) => { const f = regions.find((r) => r.properties.code === o.id); if (f) pickRegion(f) }}
+            onBlur={() => setRegionDraft(null)}
+            options={regions.map((r) => ({ id: r.properties.code, label: shown(r.properties), terms: [other(r.properties)] }))}
+            placeholder={value.countryCode ? t('loc.regionPlaceholder') : t('loc.countryFirst')}
             disabled={!value.countryCode || readOnly}
+            classNames={{ combo: styles.combo, input: styles.input }}
           />
-          <datalist id="geo-admin1">
-            {regions.map((r) => <option key={r.properties.code} value={r.properties.name} />)}
-          </datalist>
         </label>
       </div>
-      <small className={styles.help}>주·도는 목록에서 검색하거나 아래 지도에서 클릭해 고릅니다. 모르면 비워 두세요.</small>
+      <small className={styles.help}>{t('loc.help')}</small>
 
       <RegionMap regions={regions} country={country} selected={value.admin1Code} loading={admin1.isLoading} onPick={pickRegion} pin={pin} />
 
@@ -173,27 +198,27 @@ export function LocationPicker(props: {
         <>
           <div className={styles.coords}>
             <CoordField
-              label="위도 *"
+              label={t('loc.lat')}
               value={pin.coords?.lat}
               disabled={readOnly}
               onChange={(lat) => pin.onChange({ lat, lng: pin.coords?.lng ?? 0 })}
             />
             <CoordField
-              label="경도 *"
+              label={t('loc.lng')}
               value={pin.coords?.lng}
               disabled={readOnly}
               onChange={(lng) => pin.onChange({ lat: pin.coords?.lat ?? 0, lng })}
             />
             <button type="button" className={styles.reset} disabled={readOnly || !country} onClick={() => pin.onChange(defaultCoords(country, regionFeature))}>
-              <Undo2 size={14} /> 대표 지점으로
+              <Undo2 size={14} /> {t('loc.reset')}
             </button>
           </div>
           <div className={styles.callout}>
             <Info size={14} />
             <span>
-              <b>기본값: 주·도 대표 지점 · 국가만 있으면 수도</b>
+              <b>{t('loc.defaultTitle')}</b>
               <br />
-              {readOnly ? '기존 장소를 고르면 그 장소의 좌표를 그대로 씁니다.' : '지도를 클릭해 실제 도시 위치로 핀을 옮길 수 있습니다.'}
+              {readOnly ? t('loc.existingHint') : t('loc.pinHint')}
             </span>
           </div>
         </>
@@ -201,30 +226,13 @@ export function LocationPicker(props: {
         <div className={styles.callout}>
           <Info size={14} />
           <span>
-            <b>{summary ? `선택한 위치: ${summary}` : '국가를 먼저 고르세요'}</b>
+            <b>{summary ? t('loc.selected', { summary }) : t('loc.countryFirst')}</b>
             <br />
-            주·도를 비워 둘 경우 국가 단위로 등록됩니다.
+            {t('loc.emptyRegionNote')}
           </span>
         </div>
       )}
     </section>
-  )
-}
-
-function Combo(props: { list: string; value: string; onChange: (v: string) => void; placeholder: string; disabled?: boolean }) {
-  return (
-    <span className={styles.combo}>
-      <Search size={14} aria-hidden />
-      <input
-        className={styles.input}
-        list={props.list}
-        value={props.value}
-        onChange={(e) => props.onChange(e.target.value)}
-        placeholder={props.placeholder}
-        disabled={props.disabled}
-      />
-      <ChevronDown size={14} aria-hidden />
-    </span>
   )
 }
 
@@ -263,6 +271,7 @@ function RegionMap(props: {
   pin?: PinControl
 }) {
   const { regions, country, selected, loading, onPick, pin } = props
+  const { lang, t } = useI18n()
   const svgRef = useRef<SVGSVGElement>(null)
   const zoomRef = useRef<ZoomBehavior<SVGSVGElement, unknown> | null>(null)
   const [transform, setTransform] = useState<ZoomTransform>(zoomIdentity)
@@ -332,7 +341,7 @@ function RegionMap(props: {
         ref={svgRef}
         viewBox={`0 0 ${MAP_W} ${MAP_H}`}
         role="img"
-        aria-label={pin ? '공개 좌표 지도' : '주·도 선택 지도'}
+        aria-label={pin ? t('loc.mapPin') : t('loc.mapRegion')}
         onClick={pin ? placePin : undefined}
       >
         <g transform={transform.toString()}>
@@ -344,7 +353,7 @@ function RegionMap(props: {
               style={{ strokeWidth: (feature.properties.code === selected ? 1.5 : 0.6) / transform.k }}
               onClick={pin ? undefined : () => onPick(feature)}
             >
-              <title>{feature.properties.name}</title>
+              <title>{lang === 'en' ? feature.properties.nameEn || feature.properties.name : feature.properties.name}</title>
             </path>
           ))}
           {pinPoint && (
@@ -357,20 +366,20 @@ function RegionMap(props: {
       </svg>
       <span className={styles.mapHint}>
         {loading
-          ? '경계를 불러오는 중…'
+          ? t('loc.loading')
           : !regions.length
-            ? '국가를 고르면 주·도 경계가 나타납니다'
+            ? t('loc.pickCountry')
             : pin
               ? pin.readOnly
-                ? '기존 장소 위치 · 확대/축소'
-                : '지도를 클릭하면 공개 핀을 옮깁니다 · 확대/축소'
-              : '지역을 클릭하면 선택할 수 있습니다.'}
+                ? t('loc.readonlyHint')
+                : t('loc.pinMapHint')
+              : t('loc.regionMapHint')}
       </span>
       <div className={styles.zoom}>
-        <button type="button" aria-label="확대" onClick={() => zoomBy(1.6)}>
+        <button type="button" aria-label={t('loc.zoomIn')} onClick={() => zoomBy(1.6)}>
           <Plus size={14} />
         </button>
-        <button type="button" aria-label="축소" onClick={() => zoomBy(1 / 1.6)}>
+        <button type="button" aria-label={t('loc.zoomOut')} onClick={() => zoomBy(1 / 1.6)}>
           <Minus size={14} />
         </button>
       </div>

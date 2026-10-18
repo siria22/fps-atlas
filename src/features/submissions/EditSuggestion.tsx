@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase.ts'
 import type { Database } from '../../lib/database.types.ts'
 import type { EvidenceLevel } from '../../lib/domain.ts'
 import type { LocationValue } from './LocationPicker.tsx'
+import { useI18n } from '../../i18n/i18n.tsx'
 import styles from './ReportForm.module.css'
 
 type SuggestionField = Database['public']['Enums']['suggestion_field']
@@ -30,6 +31,7 @@ export function EditSuggestion(props: {
   onDone: (code: string) => void
 }) {
   const { target, location, onCancel, onDone } = props
+  const { t } = useI18n()
   const [fields, setFields] = useState<SuggestionField[]>([])
   const [proposal, setProposal] = useState('')
   const [reason, setReason] = useState('')
@@ -43,11 +45,11 @@ export function EditSuggestion(props: {
 
   const submit = async () => {
     setError('')
-    if (!fields.length) return setError('고칠 항목을 하나 이상 골라 주세요.')
-    if (!proposal.trim() || !reason.trim()) return setError('어떻게 바꿔야 하는지와 그 이유를 적어 주세요.')
-    if (referenceUrl.trim() && !/^https?:\/\//.test(referenceUrl.trim())) return setError('참고 URL에 올바른 주소를 입력해 주세요.')
-    if (fixesLocation && !location.countryCode) return setError('위치를 고치려면 오른쪽 위치 카드에서 새 국가를 골라 주세요.')
-    if (fixesLocation && location.region.trim() && !location.admin1Code) return setError('주·도는 목록이나 지도에서 고르거나, 모르면 비워 주세요.')
+    if (!fields.length) return setError(t('suggest.err.fields'))
+    if (!proposal.trim() || !reason.trim()) return setError(t('suggest.err.text'))
+    if (referenceUrl.trim() && !/^https?:\/\//.test(referenceUrl.trim())) return setError(t('suggest.err.url'))
+    if (fixesLocation && !location.countryCode) return setError(t('suggest.err.country'))
+    if (fixesLocation && location.region.trim() && !location.admin1Code) return setError(t('report.err.region'))
 
     setBusy(true)
     const { data, error: insertError } = await supabase
@@ -71,43 +73,43 @@ export function EditSuggestion(props: {
       .select('code')
       .single()
     setBusy(false)
-    if (insertError) return setError(`수정 제안을 보내지 못했습니다: ${insertError.message}`)
+    if (insertError) return setError(t('suggest.err.send', { message: insertError.message }))
     onDone(data.code ?? '')
   }
 
   return (
-    <section className={`${styles.card} ${styles.suggestion}`} aria-label="수정 제안">
+    <section className={`${styles.card} ${styles.suggestion}`} aria-label={t('report.suggestEdit')}>
       <div className={styles.cardTitle}>
         <div>
-          <h2>수정 제안 · {target.title}</h2>
-          <p className={styles.caption}>등록된 정보 중 고쳐야 할 부분과 그 이유를 알려 주세요. 관리자의 확인 후 반영됩니다.</p>
+          <h2>{t('suggest.title', { title: target.title })}</h2>
+          <p className={styles.caption}>{t('suggest.caption')}</p>
         </div>
       </div>
 
       <div className={styles.current}>
-        <b>현재 등록된 정보</b>
+        <b>{t('suggest.current')}</b>
         <dl>
           <div>
-            <dt>위치</dt>
+            <dt>{t('suggest.field.위치')}</dt>
             <dd>{target.location}</dd>
           </div>
           <div>
-            <dt>근거 수준</dt>
-            <dd>{target.evidence}</dd>
+            <dt>{t('suggest.field.근거 수준')}</dt>
+            <dd>{t(`evidence.${target.evidence}`)}</dd>
           </div>
           <div>
-            <dt>근거 출처</dt>
-            <dd>{target.sourceCount}개</dd>
+            <dt>{t('suggest.field.근거 출처')}</dt>
+            <dd>{t('suggest.sourceCount', { n: target.sourceCount })}</dd>
           </div>
           <div>
-            <dt>팬덤 위키</dt>
-            <dd>{target.hasWiki ? '있음' : '없음'}</dd>
+            <dt>{t('suggest.field.팬덤 위키')}</dt>
+            <dd>{target.hasWiki ? t('suggest.has') : t('suggest.none')}</dd>
           </div>
         </dl>
       </div>
 
       <div className={styles.group}>
-        <span className={styles.label}>고칠 항목 * (여러 개 선택 가능)</span>
+        <span className={styles.label}>{t('suggest.fields')}</span>
         <div className={styles.chips}>
           {FIELDS.map((field) => (
             <button
@@ -117,34 +119,34 @@ export function EditSuggestion(props: {
               aria-pressed={fields.includes(field)}
               onClick={() => toggle(field)}
             >
-              {field}
+              {t(`suggest.field.${field}`)}
             </button>
           ))}
         </div>
       </div>
       <label className={styles.field}>
-        <span className={styles.label}>어떻게 바꿔야 하나요? *</span>
+        <span className={styles.label}>{t('suggest.how')}</span>
         <textarea className={styles.input} rows={2} maxLength={2000} value={proposal} onChange={(e) => setProposal(e.target.value)} />
       </label>
       <label className={styles.field}>
-        <span className={styles.label}>왜 그렇게 생각하나요? *</span>
+        <span className={styles.label}>{t('suggest.why')}</span>
         <textarea className={styles.input} rows={2} maxLength={2000} value={reason} onChange={(e) => setReason(e.target.value)} />
       </label>
       <label className={styles.field}>
-        <span className={styles.label}>참고 URL (선택)</span>
+        <span className={styles.label}>{t('suggest.reference')}</span>
         <input className={styles.input} type="url" value={referenceUrl} onChange={(e) => setReferenceUrl(e.target.value)} placeholder="https://" />
         <small className={styles.help}>
-          {fixesLocation ? '새 위치는 오른쪽 위치 카드에서 고른 값으로 보냅니다.' : '위치를 고치는 경우 오른쪽 위치 카드에서 새 위치를 고르세요.'}
+          {fixesLocation ? t('suggest.locationOn') : t('suggest.locationOff')}
         </small>
       </label>
 
       {error && <p role="alert" className={styles.error}>{error}</p>}
       <div className={styles.actions}>
         <button type="button" className={styles.secondary} onClick={onCancel}>
-          취소
+          {t('common.cancel')}
         </button>
         <button type="button" className={styles.primary} disabled={busy} onClick={() => void submit()}>
-          {busy ? '보내는 중…' : '수정 제안 제출'} <ArrowRight size={14} />
+          {busy ? t('suggest.sending') : t('suggest.submit')} <ArrowRight size={14} />
         </button>
       </div>
     </section>

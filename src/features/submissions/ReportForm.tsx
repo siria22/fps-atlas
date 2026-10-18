@@ -1,29 +1,36 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { ArrowRight, ChevronDown, ChevronUp, CirclePlus, Info, LockKeyhole, Map as MapIcon, Search, TriangleAlert } from 'lucide-react'
+import { ArrowRight, ChevronDown, ChevronUp, CirclePlus, Info, LockKeyhole, Map as MapIcon, TriangleAlert } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import type { Tables } from '../../lib/database.types.ts'
 import { useAuth } from '../../lib/auth.tsx'
 import { supabase } from '../../lib/supabase.ts'
 import type { Era, EvidenceLevel } from '../../lib/domain.ts'
-import { prepareImage, type PreparedImage } from './images.ts'
+import { ImageError, prepareImage, type PreparedImage } from './images.ts'
 import { LocationPicker, type LocationValue } from './LocationPicker.tsx'
 import { EditSuggestion, type SuggestionTarget } from './EditSuggestion.tsx'
-import { ko } from '../../i18n/messages.ts'
+import { useI18n } from '../../i18n/i18n.tsx'
+import { usePlaceLabels } from '../atlas/placeLabels.ts'
+import { SearchCombo } from '../../components/SearchCombo.tsx'
 import styles from './ReportForm.module.css'
 
 type Submission = Tables<'submissions'>
 type CatalogGame = { id: string; name: string; aliases: string[] }
-type CatalogPlace = { mapPlaceId: string; placeId: string; placeName: string; region: string | null; country: string; evidence: EvidenceLevel; sourceCount: number }
+type CatalogPlace = {
+  mapPlaceId: string
+  placeId: string
+  placeName: string
+  placeNameEn: string | null
+  region: string | null
+  country: string
+  countryCode: string | null
+  admin1Code: string | null
+  evidence: EvidenceLevel
+  sourceCount: number
+}
 type CatalogMap = { id: string; gameId: string; name: string; aliases: string[]; era: Era; wikiUrl: string | null; places: CatalogPlace[] }
 
 const evidenceLevels: EvidenceLevel[] = ['공식', '커뮤니티 추정', '기타']
-// 필터 툴팁·이용 안내와 같은 정의(src/i18n/messages.ts filter.help.*)
-const evidenceHelp: Record<EvidenceLevel, string> = {
-  공식: ko['filter.help.공식'],
-  '커뮤니티 추정': ko['filter.help.커뮤니티 추정'],
-  기타: ko['filter.help.기타'],
-}
 /** 맵 이름이 이 길이 이상일 때 등록된 맵을 찾는다. */
 const MIN_MATCH_LENGTH = 2
 const MAX_MATCHES = 3
@@ -40,7 +47,7 @@ function useCatalog() {
         supabase.from('games').select('id, name, game_aliases ( alias )').order('name'),
         supabase
           .from('maps')
-          .select('id, game_id, name, era, wiki_url, map_aliases ( alias ), map_places ( id, evidence_level, map_place_sources ( url ), places ( id, name, region, country ) )')
+          .select('id, game_id, name, era, wiki_url, map_aliases ( alias ), map_places ( id, evidence_level, map_place_sources ( url ), places ( id, name, name_en, region, country, country_code, admin1_code ) )')
           .order('name'),
       ])
       if (games.error) throw games.error
@@ -62,8 +69,11 @@ function useCatalog() {
                       mapPlaceId: mp.id,
                       placeId: mp.places.id,
                       placeName: mp.places.name,
+                      placeNameEn: mp.places.name_en,
                       region: mp.places.region,
                       country: mp.places.country,
+                      countryCode: mp.places.country_code,
+                      admin1Code: mp.places.admin1_code,
                       evidence: mp.evidence_level,
                       sourceCount: mp.map_place_sources.length,
                     },
@@ -80,6 +90,7 @@ function useCatalog() {
 /** 화면 03-a·03-b(맵 찾기) → 03-c(제보 내용). 위치 카드는 두 단계 모두 오른쪽에 유지한다. */
 export function ReportForm() {
   const { user } = useAuth()
+  const { t } = useI18n()
   const catalog = useCatalog()
   const navigate = useNavigate()
   const route = useLocation()
@@ -128,16 +139,19 @@ export function ReportForm() {
       if (target === 'screenshot') setScreenshot(prepared)
       else setPhoto(prepared)
     } catch (e) {
-      setError((e as Error).message)
+      setError(e instanceof ImageError ? t(e.key) : (e as Error).message)
     }
   }
 
   const continueToDetails = () => {
     setError('')
     if (!gameName.trim() || !mapName.trim()) {
-      setError('게임 이름과 맵 이름을 입력해 주세요.')
+      setError(t('report.err.names'))
       return
     }
+    // 한국어 이름(별칭)으로 찾았어도 다음 화면·제출 확인에는 영문 공식명으로 보이게 맞춘다
+    if (game) setGameName(game.name)
+    if (existingMap) setMapName(existingMap.name)
     setStep(2)
   }
 
@@ -149,12 +163,12 @@ export function ReportForm() {
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     setError('')
-    if (!user) return setError('로그인 상태를 확인할 수 없습니다. 다시 로그인해 주세요.')
-    if (!location.countryCode) return setError('국가를 목록에서 골라 주세요.')
-    if (location.region.trim() && !location.admin1Code) return setError('주·도는 목록이나 지도에서 고르거나, 모르면 비워 주세요.')
-    if (needsSource && !sourceUrl.trim()) return setError('공식·커뮤니티 추정 근거에는 URL이 필요합니다.')
-    if (sourceUrl.trim() && !isHttpUrl(sourceUrl)) return setError('근거 URL에 올바른 주소를 입력해 주세요.')
-    if (wikiUrl.trim() && !isHttpUrl(wikiUrl)) return setError('팬덤 위키 URL에 올바른 주소를 입력해 주세요.')
+    if (!user) return setError(t('report.err.login'))
+    if (!location.countryCode) return setError(t('report.err.country'))
+    if (location.region.trim() && !location.admin1Code) return setError(t('report.err.region'))
+    if (needsSource && !sourceUrl.trim()) return setError(t('report.err.sourceRequired'))
+    if (sourceUrl.trim() && !isHttpUrl(sourceUrl)) return setError(t('report.err.sourceUrl'))
+    if (wikiUrl.trim() && !isHttpUrl(wikiUrl)) return setError(t('report.err.wikiUrl'))
 
     setBusy(true)
     const folder = `${user.id}/${crypto.randomUUID()}`
@@ -199,11 +213,19 @@ export function ReportForm() {
         .single()
       if (insertError) throw insertError
       navigate('/report/complete', {
-        state: { code: data.code, gameName, mapName, region: location.admin1Code ? location.region : '', country: location.country },
+        state: {
+          code: data.code,
+          gameName,
+          mapName,
+          region: location.admin1Code ? location.region : '',
+          country: location.country,
+          countryCode: location.countryCode,
+          admin1Code: location.admin1Code,
+        },
       })
     } catch (e) {
       if (uploaded.length) await supabase.storage.from('submission-images').remove(uploaded)
-      setError(`제보를 제출하지 못했습니다: ${(e as Error).message}`)
+      setError(t('report.err.submit', { message: (e as Error).message }))
     } finally {
       setBusy(false)
     }
@@ -214,12 +236,12 @@ export function ReportForm() {
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <h1>장소 제보 및 수정 요청</h1>
+        <h1>{t('report.title')}</h1>
       </header>
 
       {resubmit && (
         <p className={styles.notice}>
-          <Info size={14} /> 기존 내용을 불러왔습니다. 비공개 이미지는 다시 첨부하고 권리를 확인해 주세요.
+          <Info size={14} /> {t('report.resubmitNotice')}
         </p>
       )}
 
@@ -228,14 +250,14 @@ export function ReportForm() {
           <section className={`${styles.card} ${styles.selectedMap}`}>
             <div>
               <h2>
-                {gameName} · {mapName} <span className={styles.badge}>{existingMap ? '등록된 맵' : '새 맵'}</span>
+                {gameName} · {mapName} <span className={styles.badge}>{existingMap ? t('report.mapRegistered') : t('report.mapNew')}</span>
               </h2>
               <p className={styles.caption}>
-                {existingMap ? '등록된 맵에 새 장소를 제보합니다.' : '등록된 맵이 없어 새 맵으로 제보합니다.'} 바꾸려면 맵 변경을 누르세요.
+                {existingMap ? t('report.mapRegisteredHint') : t('report.mapNewHint')}
               </p>
             </div>
             <button type="button" className={styles.secondary} onClick={backToSearch}>
-              맵 변경
+              {t('report.changeMap')}
             </button>
           </section>
         )}
@@ -244,31 +266,27 @@ export function ReportForm() {
           <div className={styles.main}>
             {step === 1 ? (
               <section className={styles.card}>
-                <CardTitle title="게임과 맵" caption={['새로운 장소 제보 요청 시, 기존에 등록된 항목이 있는지 검색해주세요.', '기존 정보 수정 요청 시, 수정할 항목을 검색해주세요.']} />
+                <CardTitle title={t('report.gameMapTitle')} caption={[t('report.gameMapCaption1'), t('report.gameMapCaption2')]} />
                 <div className={styles.twoFields}>
                   <label className={styles.field}>
-                    <span className={styles.label}>게임 이름 *</span>
-                    <span className={styles.combo}>
-                      <Search size={14} aria-hidden />
-                      <input
-                        className={styles.input}
-                        list="report-games"
-                        value={gameName}
-                        onChange={(e) => setGameName(e.target.value)}
-                        placeholder="게임 검색 또는 직접 입력"
-                        required
-                      />
-                      <ChevronDown size={14} aria-hidden />
-                    </span>
-                    <datalist id="report-games">
-                      {catalog.data?.games.flatMap((g) => [g.name, ...g.aliases].map((n) => <option key={`${g.id}:${n}`} value={n} />))}
-                    </datalist>
-                    <small className={styles.help}>목록에서 고르거나 직접 입력하세요.</small>
+                    <span className={styles.label}>{t('report.gameName')}</span>
+                    <SearchCombo
+                      id="report-game"
+                      value={gameName}
+                      onChange={setGameName}
+                      onPick={(o) => setGameName(o.label)}
+                      // 목록에는 영문 공식명만, 한국어 이름 등 별칭으로도 찾는다(예: "배틀" → Battlefield …)
+                      options={(catalog.data?.games ?? []).map((g) => ({ id: g.id, label: g.name, terms: g.aliases }))}
+                      placeholder={t('report.gamePlaceholder')}
+                      required
+                      classNames={{ combo: styles.combo, input: styles.input }}
+                    />
+                    <small className={styles.help}>{t('report.gameHelp')}</small>
                   </label>
                   <label className={styles.field}>
-                    <span className={styles.label}>맵 이름 *</span>
-                    <input className={styles.input} value={mapName} onChange={(e) => setMapName(e.target.value)} placeholder="게임 맵 이름" required />
-                    <small className={styles.help}>등록된 맵이 있을 경우 표시됩니다.</small>
+                    <span className={styles.label}>{t('report.mapName')}</span>
+                    <input className={styles.input} value={mapName} onChange={(e) => setMapName(e.target.value)} placeholder={t('report.mapPlaceholder')} required />
+                    <small className={styles.help}>{t('report.mapHelp')}</small>
                   </label>
                 </div>
 
@@ -276,7 +294,7 @@ export function ReportForm() {
                   matches.length > 0 ? (
                     <div className={styles.matchBox}>
                       <strong className={styles.matchTitle}>
-                        <TriangleAlert size={14} /> 이미 등록된 맵입니다.
+                        <TriangleAlert size={14} /> {t('report.matchTitle')}
                       </strong>
                       {matches.map((m) => (
                         <MatchRow
@@ -290,11 +308,11 @@ export function ReportForm() {
                           }}
                         />
                       ))}
-                      <small className={styles.help}>같은 위치의 다른 맵을 등록하고자 할 경우, 다음 버튼을 눌러주세요.</small>
+                      <small className={styles.help}>{t('report.matchHelp')}</small>
                     </div>
                   ) : (
-                    <Callout icon={<CirclePlus size={14} />} title="등록된 맵 중 일치하는 항목이 없습니다">
-                      새 맵으로 제보합니다. 다음을 눌러 근거와 추가 자료를 입력하세요.
+                    <Callout icon={<CirclePlus size={14} />} title={t('report.noMatchTitle')}>
+                      {t('report.noMatchBody')}
                     </Callout>
                   )
                 )}
@@ -302,7 +320,7 @@ export function ReportForm() {
                 {error && <p role="alert" className={styles.error}>{error}</p>}
                 <div className={styles.actions}>
                   <button type="button" className={styles.primary} disabled={catalog.isLoading} onClick={continueToDetails}>
-                    다음 <ArrowRight size={14} />
+                    {t('common.next')} <ArrowRight size={14} />
                   </button>
                 </div>
               </section>
@@ -321,57 +339,57 @@ export function ReportForm() {
             )}
             {step === 1 && suggestionCode && (
               <p className={styles.notice} role="status">
-                <Info size={14} /> 수정 제안이 접수되었습니다 ({suggestionCode}). 관리자의 확인 후 반영됩니다.
+                <Info size={14} /> {t('report.suggestionDone', { code: suggestionCode })}
               </p>
             )}
             {step === 2 && (
               <>
                 <section className={styles.card}>
-                  <CardTitle title="근거" caption={['맵과 실제 장소의 연결을 뒷받침하는 근거 수준을 고르세요.', '각 항목을 클릭하면 설명이 표시됩니다.']} />
+                  <CardTitle title={t('report.evidenceTitle')} caption={[t('report.evidenceCaption1'), t('report.evidenceCaption2')]} />
                   <div className={styles.group}>
-                    <span className={styles.label}>근거 수준 *</span>
+                    <span className={styles.label}>{t('report.evidenceLevel')}</span>
                     <div className={styles.chips}>
                       {evidenceLevels.map((item) => (
                         <button type="button" key={item} className={evidence === item ? styles.chipActive : styles.chip} aria-pressed={evidence === item} onClick={() => setEvidence(item)}>
-                          {item}
+                          {t(`evidence.${item}`)}
                         </button>
                       ))}
                     </div>
                     <p className={styles.evidenceHelp}>
-                      <Info size={14} /> {evidence} — {evidenceHelp[evidence]}
+                      <Info size={14} /> {t(`evidence.${evidence}`)} — {t(`filter.help.${evidence}`)}
                     </p>
                   </div>
                   <label className={styles.field}>
-                    <span className={styles.label}>근거 URL {needsSource ? '*' : '(선택)'}</span>
+                    <span className={styles.label}>{t('report.sourceUrl')} {needsSource ? '*' : t('report.optional')}</span>
                     <input
                       className={styles.input}
                       type="url"
                       value={sourceUrl}
                       onChange={(e) => setSourceUrl(e.target.value)}
-                      placeholder="https:// 커뮤니티 글, 영상 등 근거 자료 주소"
+                      placeholder={t('report.sourcePlaceholder')}
                       required={needsSource}
                     />
                     <ul className={`${styles.help} ${styles.bullets}`}>
-                      <li>주장을 뒷받침할만한 자료를 제시해주세요.</li>
-                      <li>공식: 공식 홈페이지, 디렉터/디자이너 인터뷰, 소개 영상의 유튜브 링크, 신뢰할 수 있는 공식 소스 등</li>
-                      <li>커뮤니티 추정: 최소한의 근거를 갖춘 플레이어 커뮤니티의 게시글 등</li>
+                      <li>{t('report.sourceHelp1')}</li>
+                      <li>{t('report.sourceHelp2')}</li>
+                      <li>{t('report.sourceHelp3')}</li>
                     </ul>
                   </label>
                 </section>
 
                 <section className={styles.card}>
-                  <CardTitle title="추가 자료" caption="이하의 내용들은 빠른 검토를 위한 선택 사항입니다." />
+                  <CardTitle title={t('report.extraTitle')} caption={t('report.extraCaption')} />
                   <label className={styles.field}>
-                    <span className={styles.label}>팬덤 위키 URL (선택)</span>
-                    <input className={styles.input} type="url" value={wikiUrl} onChange={(e) => setWikiUrl(e.target.value)} placeholder="해당 맵의 팬덤 위키 링크" />
+                    <span className={styles.label}>{t('report.wikiUrl')}</span>
+                    <input className={styles.input} type="url" value={wikiUrl} onChange={(e) => setWikiUrl(e.target.value)} placeholder={t('report.wikiPlaceholder')} />
                   </label>
                   <label className={styles.field}>
-                    <span className={styles.label}>추가 설명 (선택)</span>
-                    <textarea className={styles.input} value={description} onChange={(e) => setDescription(e.target.value)} rows={3} maxLength={1000} placeholder="맵과 실제 장소의 관계에 대한 설명" />
+                    <span className={styles.label}>{t('report.description')}</span>
+                    <textarea className={styles.input} value={description} onChange={(e) => setDescription(e.target.value)} rows={3} maxLength={1000} placeholder={t('report.descriptionPlaceholder')} />
                   </label>
                   <div className={styles.twoFields}>
                     <ImageAttach
-                      label="인게임 스크린샷 (선택)"
+                      label={t('report.screenshot')}
                       image={screenshot}
                       rights={screenshotRights}
                       onRights={(checked) => {
@@ -382,7 +400,7 @@ export function ReportForm() {
                       onRemove={() => setScreenshot(null)}
                     />
                     <ImageAttach
-                      label="장소의 실제 이미지 (선택)"
+                      label={t('report.photo')}
                       image={photo}
                       rights={photoRights}
                       onRights={(checked) => {
@@ -394,7 +412,7 @@ export function ReportForm() {
                     />
                   </div>
                   <small className={styles.privateNote}>
-                    <LockKeyhole size={12} /> 첨부 이미지는 관리자의 승인 전까지 게시되지 않습니다.
+                    <LockKeyhole size={12} /> {t('report.privateNote')}
                   </small>
                 </section>
               </>
@@ -408,10 +426,10 @@ export function ReportForm() {
             {error && <p role="alert" className={styles.error}>{error}</p>}
             <div className={styles.actions}>
               <button type="button" className={styles.secondary} onClick={backToSearch}>
-                이전
+                {t('common.back')}
               </button>
               <button type="submit" className={styles.primary} disabled={busy}>
-                {busy ? '제출 중…' : '장소 제보 제출'} <ArrowRight size={14} />
+                {busy ? t('report.submitting') : t('report.submit')} <ArrowRight size={14} />
               </button>
             </div>
           </>
@@ -464,7 +482,13 @@ function Callout({ icon, title, children }: { icon: ReactNode; title: string; ch
 /** 03-b: 등록된 맵 한 줄. 장소가 여러 곳이면 장소마다 "지도에서 보기"(새 탭, 작성 중인 폼 유지)와 "정보 수정 제안"을 둔다. */
 function MatchRow(props: { gameName: string; map: CatalogMap; activeId: string | null; onSuggest: (target: SuggestionTarget) => void }) {
   const { gameName, map, activeId, onSuggest } = props
+  const { t } = useI18n()
+  const labels = usePlaceLabels()
   const places = map.places.length ? map.places : [null]
+  const where = (p: CatalogPlace) => {
+    const names = { name: p.placeName, nameEn: p.placeNameEn, country: p.country, region: p.region, countryCode: p.countryCode, admin1Code: p.admin1Code }
+    return `${labels.country(names)} > ${labels.region(names) ?? labels.name(names)}`
+  }
   return (
     <>
       {places.map((place) => (
@@ -473,11 +497,15 @@ function MatchRow(props: { gameName: string; map: CatalogMap; activeId: string |
             <b>
               {gameName} · {map.name}
             </b>
-            <small>{place ? `${place.country} > ${place.region ?? place.placeName} · 근거 ${place.evidence} · ${map.era}` : `장소 연결 없음 · ${map.era}`}</small>
+            <small>
+              {place
+                ? t('report.matchPlace', { location: where(place), evidence: t(`evidence.${place.evidence}`), era: t(`era.${map.era}`) })
+                : t('report.matchNoPlace', { era: t(`era.${map.era}`) })}
+            </small>
           </div>
           {place && (
             <Link className={styles.small} to={`/?place=${encodeURIComponent(place.placeId)}`} target="_blank" rel="noopener">
-              <MapIcon size={14} /> 지도에서 보기
+              <MapIcon size={14} /> {t('report.viewOnMap')}
             </Link>
           )}
           {place && (
@@ -489,14 +517,14 @@ function MatchRow(props: { gameName: string; map: CatalogMap; activeId: string |
                 onSuggest({
                   mapPlaceId: place.mapPlaceId,
                   title: `${gameName} · ${map.name}`,
-                  location: `${place.country} > ${place.region ?? place.placeName}`,
+                  location: where(place),
                   evidence: place.evidence,
                   sourceCount: place.sourceCount,
                   hasWiki: Boolean(map.wikiUrl),
                 })
               }
             >
-              정보 수정 제안 {activeId === place.mapPlaceId ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              {t('report.suggestEdit')} {activeId === place.mapPlaceId ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             </button>
           )}
         </div>
@@ -515,6 +543,7 @@ function ImageAttach(props: {
   onRemove: () => void
 }) {
   const { label, image, rights, onRights, onSelect, onRemove } = props
+  const { t } = useI18n()
   const input = useRef<HTMLInputElement>(null)
   return (
     <div className={styles.attach}>
@@ -534,27 +563,27 @@ function ImageAttach(props: {
       />
       {image ? (
         <div className={styles.preview}>
-          <img src={image.attached.previewUrl} alt={`${label} 미리보기`} />
+          <img src={image.attached.previewUrl} alt={t('report.preview', { label })} />
           <span>
             <b>{image.attached.fileName}</b>
             <small>
               {image.attached.width} × {image.attached.height} · WebP · {Math.round(image.attached.bytes / 1024)}KB
             </small>
             <button type="button" onClick={onRemove}>
-              삭제
+              {t('common.remove')}
             </button>
           </span>
         </div>
       ) : (
         <button type="button" className={styles.dropzone} disabled={!rights} onClick={() => input.current?.click()}>
-          이미지를 클릭해 선택
-          <small>JPG·PNG·WebP·최대 15MB까지</small>
-          {!rights && <small className={styles.rightsNote}>저작권 확인 사항에 체크하면 업로드할 수 있습니다</small>}
+          {t('report.pickImage')}
+          <small>{t('report.imageHint')}</small>
+          {!rights && <small className={styles.rightsNote}>{t('report.rightsFirst')}</small>}
         </button>
       )}
       <label className={styles.rights}>
         <input type="checkbox" checked={rights} onChange={(e) => onRights(e.target.checked)} />
-        직접 촬영했거나 저작권상 사용 가능한 이미지입니다
+        {t('report.rights')}
       </label>
     </div>
   )

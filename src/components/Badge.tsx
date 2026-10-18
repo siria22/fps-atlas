@@ -1,5 +1,6 @@
 import type { EvidenceLevel, SubmissionStatus } from '../lib/domain.ts'
 import { cx } from '../lib/cx.ts'
+import { useI18n } from '../i18n/i18n.tsx'
 import styles from './Badge.module.css'
 
 const EVIDENCE: Record<EvidenceLevel, { icon: string; className: string | undefined }> = {
@@ -11,10 +12,11 @@ const EVIDENCE: Record<EvidenceLevel, { icon: string; className: string | undefi
 /** Figma: Evidence Badge */
 export function EvidenceBadge({ level }: { level: EvidenceLevel }) {
   const { icon, className } = EVIDENCE[level]
+  const { t } = useI18n()
   return (
     <span className={cx(styles.badge, className)}>
       <span aria-hidden>{icon}</span>
-      {level}
+      {t(`evidence.${level}`)}
     </span>
   )
 }
@@ -27,5 +29,6 @@ const STATUS: Record<SubmissionStatus, string | undefined> = {
 
 /** Figma: StatusBadge */
 export function StatusBadge({ status }: { status: SubmissionStatus }) {
-  return <span className={cx(styles.badge, styles.status, STATUS[status])}>{status}</span>
+  const { t } = useI18n()
+  return <span className={cx(styles.badge, styles.status, STATUS[status])}>{t(`status.${status}`)}</span>
 }

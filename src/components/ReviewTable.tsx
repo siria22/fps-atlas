@@ -3,10 +3,10 @@ import { ChevronLeft, ChevronRight, Info, Search } from 'lucide-react'
 import { FilterChip } from './FilterChip.tsx'
 import { SubmissionRow } from './TableRow.tsx'
 import type { SubmissionStatus } from '../lib/domain.ts'
+import { useI18n } from '../i18n/i18n.tsx'
 import styles from './ReviewTable.module.css'
 
 const PAGE_SIZE = 7
-const formatDate = (value: string) => new Intl.DateTimeFormat('ko-KR', { dateStyle: 'short' }).format(new Date(value))
 
 export interface ReviewItem {
   id: number
@@ -37,6 +37,8 @@ export function ReviewTable(props: {
   footnote?: ReactNode
 }) {
   const { items, headers, searchLabel, selectedId, onSelect, onOpen, footnote } = props
+  const { lang, t } = useI18n()
+  const formatDate = (value: string) => new Intl.DateTimeFormat(lang === 'en' ? 'en-US' : 'ko-KR', { dateStyle: 'short' }).format(new Date(value))
   const [filter, setFilter] = useState<Filter>('전체')
   const [query, setQuery] = useState('')
   const [newestFirst, setNewestFirst] = useState(true)
@@ -64,7 +66,7 @@ export function ReviewTable(props: {
         <div className={styles.chips}>
           {FILTERS.map((f) => (
             <FilterChip key={f} selected={filter === f} onClick={() => { setFilter(f); reset() }}>
-              {f} {count(f)}
+              {f === '전체' ? t('table.all') : t(`status.${f}`)} {count(f)}
             </FilterChip>
           ))}
         </div>
@@ -72,7 +74,7 @@ export function ReviewTable(props: {
           <Search size={14} aria-hidden />
           <input aria-label={searchLabel} placeholder={searchLabel} value={query} onChange={(e) => { setQuery(e.target.value); reset() }} />
           <button type="button" className={styles.sort} onClick={() => { setNewestFirst((v) => !v); reset() }}>
-            {newestFirst ? '최신순 ↓' : '오래된순 ↑'}
+            {newestFirst ? t('table.newest') : t('table.oldest')}
           </button>
         </span>
       </div>
@@ -93,17 +95,17 @@ export function ReviewTable(props: {
           onClick={() => { onSelect(row.id); onOpen?.(row.id) }}
         />
       ))}
-      {!rows.length && <p className={styles.empty}>조건에 맞는 항목이 없습니다.</p>}
+      {!rows.length && <p className={styles.empty}>{t('table.empty')}</p>}
       <div className={styles.footer}>
         <span>
-          총 {rows.length}개 · {rows.length ? current * PAGE_SIZE + 1 : 0}–{Math.min(current * PAGE_SIZE + PAGE_SIZE, rows.length)} 표시
+          {t('table.range', { total: rows.length, from: rows.length ? current * PAGE_SIZE + 1 : 0, to: Math.min(current * PAGE_SIZE + PAGE_SIZE, rows.length) })}
         </span>
         <span className={styles.pager}>
-          <button type="button" className={styles.pagerArrow} aria-label="이전 페이지" disabled={current === 0} onClick={() => setPage(current - 1)}>
+          <button type="button" className={styles.pagerArrow} aria-label={t('table.prev')} disabled={current === 0} onClick={() => setPage(current - 1)}>
             <ChevronLeft size={16} />
           </button>
           <FilterChip selected>{current + 1}</FilterChip>
-          <button type="button" className={styles.pagerArrow} aria-label="다음 페이지" disabled={current + 1 >= pageCount} onClick={() => setPage(current + 1)}>
+          <button type="button" className={styles.pagerArrow} aria-label={t('table.next')} disabled={current + 1 >= pageCount} onClick={() => setPage(current + 1)}>
             <ChevronRight size={16} />
           </button>
         </span>

@@ -34,7 +34,7 @@ export function AppLayout() {
   const [authError, setAuthError] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
   const location = useLocation()
-  const { t } = useI18n()
+  const { lang, t } = useI18n()
 
   // 다른 화면으로 이동하면 메뉴를 닫는다.
   useEffect(() => setMenuOpen(false), [location.pathname])
@@ -48,7 +48,7 @@ export function AppLayout() {
   const name = profile?.display_name ?? user?.user_metadata.name ?? ''
   // 탈퇴 창은 공개 이미지 출처에 남는 이름을 보여 준다(실명이 아닌 닉네임)
   const creditName = profile?.nickname ?? ''
-  const login = () => { setAuthError(''); void loginWithGoogle(window.location.pathname).catch((e: Error) => setAuthError(e.message)) }
+  const login = () => { setAuthError(''); void loginWithGoogle(window.location.pathname).catch((e: Error) => setAuthError(lang === 'en' ? t('auth.loginFailed') : e.message)) }
   const logout = () => { setAuthError(''); void signOut().catch((e: Error) => setAuthError(e.message)) }
   const navItems = (className?: string, activeClass?: string) => (
     <>
