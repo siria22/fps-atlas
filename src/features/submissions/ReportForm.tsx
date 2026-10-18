@@ -13,9 +13,9 @@ import { ko } from '../../i18n/messages.ts'
 import styles from './ReportForm.module.css'
 
 type Submission = Tables<'submissions'>
-type CatalogGame = { id: string; name: string }
+type CatalogGame = { id: string; name: string; aliases: string[] }
 type CatalogPlace = { mapPlaceId: string; placeId: string; placeName: string; region: string | null; country: string; evidence: EvidenceLevel; sourceCount: number }
-type CatalogMap = { id: string; gameId: string; name: string; era: Era; wikiUrl: string | null; places: CatalogPlace[] }
+type CatalogMap = { id: string; gameId: string; name: string; aliases: string[]; era: Era; wikiUrl: string | null; places: CatalogPlace[] }
 
 const evidenceLevels: EvidenceLevel[] = ['공식', '커뮤니티 추정', '기타']
 // 필터 툴팁·이용 안내와 같은 정의(src/i18n/messages.ts filter.help.*)
@@ -37,21 +37,22 @@ function useCatalog() {
     staleTime: 5 * 60_000,
     queryFn: async () => {
       const [games, maps] = await Promise.all([
-        supabase.from('games').select('id, name').order('name'),
+        supabase.from('games').select('id, name, game_aliases ( alias )').order('name'),
         supabase
           .from('maps')
-          .select('id, game_id, name, era, wiki_url, map_places ( id, evidence_level, map_place_sources ( url ), places ( id, name, region, country ) )')
+          .select('id, game_id, name, era, wiki_url, map_aliases ( alias ), map_places ( id, evidence_level, map_place_sources ( url ), places ( id, name, region, country ) )')
           .order('name'),
       ])
       if (games.error) throw games.error
       if (maps.error) throw maps.error
       return {
-        games: games.data as CatalogGame[],
+        games: games.data.map((g): CatalogGame => ({ id: g.id, name: g.name, aliases: g.game_aliases.map((a) => a.alias) })),
         maps: maps.data.map(
           (m): CatalogMap => ({
             id: m.id,
             gameId: m.game_id,
             name: m.name,
+            aliases: m.map_aliases.map((a) => a.alias),
             era: m.era,
             wikiUrl: m.wiki_url,
             places: m.map_places.flatMap((mp) =>
@@ -105,14 +106,16 @@ export function ReportForm() {
   const [suggestionCode, setSuggestionCode] = useState<string | null>(null)
   const [error, setError] = useState('')
 
-  const game = catalog.data?.games.find((g) => normalize(g.name) === normalize(gameName)) ?? null
+  // 게임·맵은 영문 공식명과 검색용 별칭(한국어 이름 등) 모두로 찾는다.
+  const names = (x: { name: string; aliases: string[] }) => [x.name, ...x.aliases].map(normalize)
+  const game = catalog.data?.games.find((g) => names(g).includes(normalize(gameName))) ?? null
   const typedMap = normalize(mapName)
   const matches =
     game && typedMap.length >= MIN_MATCH_LENGTH
-      ? (catalog.data?.maps ?? []).filter((m) => m.gameId === game.id && normalize(m.name).includes(typedMap)).slice(0, MAX_MATCHES)
+      ? (catalog.data?.maps ?? []).filter((m) => m.gameId === game.id && names(m).some((n) => n.includes(typedMap))).slice(0, MAX_MATCHES)
       : []
-  // 이름이 정확히 같은 등록된 맵이 있으면 그 맵에 새 장소를 제보하는 것으로 본다.
-  const existingMap = matches.find((m) => normalize(m.name) === typedMap) ?? null
+  // 이름(또는 별칭)이 정확히 같은 등록된 맵이 있으면 그 맵에 새 장소를 제보하는 것으로 본다.
+  const existingMap = matches.find((m) => names(m).includes(typedMap)) ?? null
   const needsSource = evidence !== '기타'
 
   useEffect(() => () => { if (screenshot) URL.revokeObjectURL(screenshot.attached.previewUrl) }, [screenshot])
@@ -173,9 +176,9 @@ export function ReportForm() {
         .from('submissions')
         .insert({
           game_id: game?.id ?? null,
-          game_name: gameName.trim(),
+          game_name: game?.name ?? gameName.trim(),
           map_id: existingMap?.id ?? null,
-          map_name: mapName.trim(),
+          map_name: existingMap?.name ?? mapName.trim(),
           evidence_level: evidence,
           source_url: sourceUrl.trim() || null,
           wiki_url: wikiUrl.trim() || null,
@@ -258,7 +261,7 @@ export function ReportForm() {
                       <ChevronDown size={14} aria-hidden />
                     </span>
                     <datalist id="report-games">
-                      {catalog.data?.games.map((g) => <option key={g.id} value={g.name} />)}
+                      {catalog.data?.games.flatMap((g) => [g.name, ...g.aliases].map((n) => <option key={`${g.id}:${n}`} value={n} />))}
                     </datalist>
                     <small className={styles.help}>목록에서 고르거나 직접 입력하세요.</small>
                   </label>
